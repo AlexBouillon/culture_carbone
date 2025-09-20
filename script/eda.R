@@ -1,12 +1,32 @@
 # Analyse exploratoire des données - Culture Carbone
 # Script d'analyse exploratoire pour data_clean.rds avec pondération
 
+# Vérifier et charger les packages nécessaires
+if (!require(ggplot2, quietly = TRUE)) install.packages("ggplot2")
+if (!require(dplyr, quietly = TRUE)) install.packages("dplyr")
+if (!require(gridExtra, quietly = TRUE)) install.packages("gridExtra")
+if (!require(corrplot, quietly = TRUE)) install.packages("corrplot")
+if (!require(weights, quietly = TRUE)) install.packages("weights")
+library(ggthemes)
 library(ggplot2)
 library(dplyr)
 library(gridExtra)
 library(corrplot)
-library(GGally)
 library(weights) # Pour les analyses pondérées
+
+# Vérifier la version de ggplot2 et charger GGally si compatible
+ggplot_version <- packageVersion("ggplot2")
+cat("Version de ggplot2 installée:", as.character(ggplot_version), "\n")
+
+if (ggplot_version >= "4.0.0") {
+  if (!require(GGally, quietly = TRUE)) install.packages("GGally")
+  library(GGally)
+  use_ggally <- TRUE
+} else {
+  cat("ATTENTION: GGally nécessite ggplot2 >= 4.0.0. Analyse multivariée limitée.\n")
+  cat("Pour résoudre: update.packages('ggplot2') ou install.packages('ggplot2', type='source')\n")
+  use_ggally <- FALSE
+}
 
 # Charger les données
 data <- readRDS("_SharedFolder_culture_carbone/data/data_clean.rds")
@@ -25,76 +45,98 @@ if (!dir.exists("_SharedFolder_culture_carbone/graph")) {
 # 1. Distribution par arrondissement (pondérée)
 p1 <- ggplot(data, aes(x = ses_arrondissement, weight = POND)) +
   geom_bar(fill = "steelblue", alpha = 0.7) +
-  theme_minimal() +
+  theme_fivethirtyeight(base_size = 14) +
   labs(title = "Distribution par arrondissement (pondérée)",
        x = "Arrondissement",
        y = "Fréquence pondérée") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    legend.position = "bottom"
+        )
 
 ggsave("_SharedFolder_culture_carbone/graph/dist_arrondissement.png", p1, width = 10, height = 6)
 
 # 2. Distribution par âge (pondérée)
 p2 <- ggplot(data, aes(x = ses_age, weight = POND)) +
   geom_bar(fill = "forestgreen", alpha = 0.7) +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Distribution par groupe d'âge (pondérée)",
        x = "Groupe d'âge",
        y = "Fréquence pondérée") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+        theme(
+          plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "bottom"
+              )
 
 ggsave("_SharedFolder_culture_carbone/graph/dist_age.png", p2, width = 8, height = 6)
 
 # 3. Distribution du genre (pondérée)
 p3 <- ggplot(data, aes(x = factor(ses_femme, labels = c("Homme", "Femme")), weight = POND)) +
   geom_bar(fill = "coral", alpha = 0.7) +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Distribution par genre (pondérée)",
        x = "Genre",
-       y = "Fréquence pondérée")
+       y = "Fréquence pondérée") +
+        theme(
+          plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "bottom"
+              )
 
 ggsave("_SharedFolder_culture_carbone/graph/dist_genre.png", p3, width = 6, height = 6)
 
 # 4. Distribution de l'éducation (pondérée)
 p4 <- ggplot(data, aes(x = ses_educ, weight = POND)) +
   geom_bar(fill = "purple", alpha = 0.7) +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Distribution par niveau d'éducation (pondérée)",
        x = "Niveau d'éducation",
        y = "Fréquence pondérée") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+        theme(
+          plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "bottom"
+              )
 
 ggsave("_SharedFolder_culture_carbone/graph/dist_education.png", p4, width = 10, height = 6)
 
 # 5. Distribution des revenus (pondérée)
 p5 <- ggplot(data, aes(x = ses_revenu_grouped, weight = POND)) +
   geom_bar(fill = "orange", alpha = 0.7) +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Distribution par groupe de revenus (pondérée)",
        x = "Groupe de revenus",
        y = "Fréquence pondérée") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+        theme(
+          plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "bottom"
+              )
 
 ggsave("_SharedFolder_culture_carbone/graph/dist_revenus.png", p5, width = 8, height = 6)
 
 # 6. Distribution du transport principal (pondérée)
 p6 <- ggplot(data, aes(x = main_transport, weight = POND)) +
   geom_bar(fill = "darkblue", alpha = 0.7) +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Distribution du mode de transport principal (pondérée)",
        x = "Mode de transport principal",
        y = "Fréquence pondérée") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+        theme(
+          plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "bottom"
+              )
 
 ggsave("_SharedFolder_culture_carbone/graph/dist_transport_principal.png", p6, width = 10, height = 6)
 
 # 7. Distribution du transport idéal (pondérée)
 p7 <- ggplot(data, aes(x = ideal, weight = POND)) +
   geom_bar(fill = "darkgreen", alpha = 0.7) +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Distribution du mode de transport idéal (pondérée)",
        x = "Mode de transport idéal",
        y = "Fréquence pondérée") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+        theme(
+          plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "bottom"
+              )
 
 ggsave("_SharedFolder_culture_carbone/graph/dist_transport_ideal.png", p7, width = 8, height = 6)
 
@@ -107,7 +149,7 @@ attitude_vars <- c("ouverture_tc", "ouverture_actif", "ouverture_combine",
 for (var in attitude_vars) {
   p_hist <- ggplot(data, aes_string(x = var, weight = "POND")) +
     geom_histogram(bins = 20, fill = "lightblue", alpha = 0.7, color = "black") +
-    theme_minimal() +
+      theme_fivethirtyeight(base_size = 14) +
     labs(title = paste("Distribution de", var, "(pondérée)"),
          x = var,
          y = "Fréquence pondérée")
@@ -122,7 +164,7 @@ opinion_vars <- c("op_rtc_num", "op_velo_num", "op_tram_num")
 for (var in opinion_vars) {
   p_op <- ggplot(data[!is.na(data[[var]]), ], aes_string(x = var, weight = "POND")) +
     geom_histogram(bins = 15, fill = "salmon", alpha = 0.7, color = "black") +
-    theme_minimal() +
+      theme_fivethirtyeight(base_size = 14) +
     labs(title = paste("Distribution des opinions -", var, "(pondérée)"),
          x = paste("Score d'opinion", var),
          y = "Fréquence pondérée")
@@ -134,7 +176,7 @@ for (var in opinion_vars) {
 # 10. Distribution de la pondération (non pondérée - pour diagnostic)
 p_pond <- ggplot(data, aes(x = POND)) +
   geom_histogram(bins = 30, fill = "gold", alpha = 0.7, color = "black") +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Distribution des poids de pondération",
        x = "Poids de pondération",
        y = "Fréquence (non pondérée)")
@@ -148,7 +190,7 @@ print("Graphiques de distribution univariés PONDÉRÉS sauvegardés dans _Share
 # 1. Transport principal vs Arrondissement (pondéré)
 p_biv1 <- ggplot(data, aes(x = ses_arrondissement, fill = main_transport_3, weight = POND)) +
   geom_bar(position = "dodge") +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Mode de transport principal par arrondissement (pondéré)",
        x = "Arrondissement",
        y = "Fréquence pondérée",
@@ -160,7 +202,7 @@ ggsave("_SharedFolder_culture_carbone/graph/biv_transport_arrondissement.png", p
 # 2. Transport principal vs Âge (pondéré)
 p_biv2 <- ggplot(data, aes(x = ses_age, fill = main_transport_3, weight = POND)) +
   geom_bar(position = "fill") +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Proportion des modes de transport par groupe d'âge (pondérée)",
        x = "Groupe d'âge",
        y = "Proportion pondérée",
@@ -172,7 +214,7 @@ ggsave("_SharedFolder_culture_carbone/graph/biv_transport_age.png", p_biv2, widt
 # 3. Transport principal vs Revenus (pondéré)
 p_biv3 <- ggplot(data, aes(x = ses_revenu_grouped, fill = main_transport_3, weight = POND)) +
   geom_bar(position = "fill") +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Proportion des modes de transport par niveau de revenus (pondérée)",
        x = "Revenus",
        y = "Proportion pondérée",
@@ -184,7 +226,7 @@ ggsave("_SharedFolder_culture_carbone/graph/biv_transport_revenus.png", p_biv3, 
 # 4. Genre vs Transport principal (pondéré)
 p_biv4 <- ggplot(data, aes(x = factor(ses_femme, labels = c("Homme", "Femme")), fill = main_transport_3, weight = POND)) +
   geom_bar(position = "dodge") +
-  theme_minimal() +
+  theme_fivethirtyeight(base_size = 14) +
   labs(title = "Mode de transport principal par genre (pondéré)",
        x = "Genre",
        y = "Fréquence pondérée",
@@ -195,7 +237,7 @@ ggsave("_SharedFolder_culture_carbone/graph/biv_transport_genre.png", p_biv4, wi
 # 5. Éducation vs Transport principal (pondéré)
 p_biv5 <- ggplot(data, aes(x = ses_educ, fill = main_transport_3, weight = POND)) +
   geom_bar(position = "fill") +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Proportion des modes de transport par niveau d'éducation (pondérée)",
        x = "Éducation",
        y = "Proportion pondérée",
@@ -209,7 +251,7 @@ ggsave("_SharedFolder_culture_carbone/graph/biv_transport_education.png", p_biv5
 # il faudrait calculer les statistiques pondérées manuellement
 p_biv6 <- ggplot(data, aes(x = main_transport_3, y = ouverture_tc, fill = main_transport_3, weight = POND)) +
   geom_boxplot(alpha = 0.7) +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Ouverture aux transports en commun par mode de transport principal",
        x = "Transport principal",
        y = "Score d'ouverture TC",
@@ -221,7 +263,7 @@ ggsave("_SharedFolder_culture_carbone/graph/biv_ouverture_tc_transport.png", p_b
 # 7. Mobilité active vs Transport principal (boxplot)
 p_biv7 <- ggplot(data, aes(x = main_transport_3, y = mobilite_active, fill = main_transport_3, weight = POND)) +
   geom_boxplot(alpha = 0.7) +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Attitude envers la mobilité active par mode de transport principal",
        x = "Transport principal",
        y = "Score mobilité active",
@@ -233,7 +275,7 @@ ggsave("_SharedFolder_culture_carbone/graph/biv_mobilite_active_transport.png", 
 # 8. Développement durable vs Transport principal
 p_biv8 <- ggplot(data, aes(x = main_transport_3, y = dev_durable, fill = main_transport_3, weight = POND)) +
   geom_boxplot(alpha = 0.7) +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Attitude envers le développement durable par mode de transport",
        x = "Transport principal",
        y = "Score développement durable",
@@ -246,7 +288,7 @@ ggsave("_SharedFolder_culture_carbone/graph/biv_dev_durable_transport.png", p_bi
 p_biv9 <- ggplot(data, aes(x = factor(ses_proprio, labels = c("Locataire", "Propriétaire")),
                           fill = main_transport_3, weight = POND)) +
   geom_bar(position = "fill") +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Proportion des modes de transport par statut de propriété (pondérée)",
        x = "Statut de propriété",
        y = "Proportion pondérée",
@@ -257,7 +299,7 @@ ggsave("_SharedFolder_culture_carbone/graph/biv_transport_propriete.png", p_biv9
 # 10. Transport idéal vs Transport principal (pondéré)
 p_biv10 <- ggplot(data, aes(x = main_transport_3, fill = ideal, weight = POND)) +
   geom_bar(position = "fill") +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Transport idéal selon le transport principal actuel (pondéré)",
        x = "Transport principal actuel",
        y = "Proportion pondérée",
@@ -316,7 +358,7 @@ ggsave("_SharedFolder_culture_carbone/graph/pairs_plot_attitudes.png", p_pairs, 
 # On peut utiliser stat_boxplot avec weight, mais l'effet est limité
 p_biv11 <- ggplot(data, aes(x = freq_bus3, y = ouverture_tc, fill = freq_bus3, weight = POND)) +
   geom_boxplot(alpha = 0.7) +
-  theme_minimal() +
+    theme_fivethirtyeight(base_size = 14) +
   labs(title = "Ouverture aux transports en commun par fréquence d'utilisation du bus",
        x = "Fréquence d'utilisation du bus",
        y = "Score d'ouverture TC",
@@ -344,7 +386,7 @@ p_knowledge <- grid.arrange(
     ggplot(aes(x = factor(know_velo, labels = c("Ne connaît pas", "Connaît")),
                y = op_velo_num)) +
     geom_boxplot(fill = "lightblue", alpha = 0.7) +
-    theme_minimal() +
+      theme_fivethirtyeight(base_size = 14) +
     labs(title = "Opinion sur le vélo selon la connaissance",
          x = "Connaissance projet vélo",
          y = "Score opinion vélo"),
@@ -353,7 +395,7 @@ p_knowledge <- grid.arrange(
     ggplot(aes(x = factor(know_tram, labels = c("Ne connaît pas", "Connaît")),
                y = op_tram_num)) +
     geom_boxplot(fill = "lightyellow", alpha = 0.7) +
-    theme_minimal() +
+      theme_fivethirtyeight(base_size = 14) +
     labs(title = "Opinion sur le tramway selon la connaissance",
          x = "Connaissance projet tramway",
          y = "Score opinion tramway"),

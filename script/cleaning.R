@@ -37,6 +37,8 @@ df_clean$ses_age[df_raw$age == 4] <- "45_54"
 df_clean$ses_age[df_raw$age == 5] <- "55_64"
 df_clean$ses_age[df_raw$age == 6] <- "65_74"
 df_clean$ses_age[df_raw$age == 7] <- "75+"
+df_clean$ses_age <- factor(df_clean$ses_age,
+  levels = c("-18", "18_24", "25_34", "35_44", "45_54", "55_64", "65_74", "75+"))
 table(df_clean$ses_age)
 
 ## genre
@@ -73,6 +75,8 @@ df_clean$ses_educ[df_raw$SCOL %in% c(1,2)] <- "Secondaire"
 df_clean$ses_educ[df_raw$SCOL %in% c(3,4)] <- "Collegial/Certificat"
 df_clean$ses_educ[df_raw$SCOL == 5] <- "Bacc"
 df_clean$ses_educ[df_raw$SCOL %in% c(6,7)] <- "Graduate"
+df_clean$ses_educ <- factor(df_clean$ses_educ,
+  levels = c("Secondaire", "OccasCollegial/Certificationnel", "Bacc", "Graduate"))
 table(df_clean$ses_educ)
 
 ## revenu
@@ -87,6 +91,8 @@ df_clean$ses_revenu[df_raw$REVEN == 6] <- "100_119k"
 df_clean$ses_revenu[df_raw$REVEN == 7] <- "120_139k"
 df_clean$ses_revenu[df_raw$REVEN == 8] <- "140_159k"
 df_clean$ses_revenu[df_raw$REVEN == 9] <- "160k+"
+df_clean$ses_revenu <- factor(df_clean$ses_revenu,
+  levels = c("-20k", "20_39k", "40_59k", "60_79k", "80_99k", "100_119k", "120_139k", "140_159k", "160k+"))
 table(df_clean$ses_revenu)
 
 df_clean$ses_revenu_grouped[df_raw$REVEN %in% c(1,2)] <- "<40k"
@@ -94,6 +100,8 @@ df_clean$ses_revenu_grouped[df_raw$REVEN %in% c(3,4)] <- "40-79k"
 df_clean$ses_revenu_grouped[df_raw$REVEN %in% c(5,6)] <- "80-119k"
 df_clean$ses_revenu_grouped[df_raw$REVEN %in% c(7,8)] <- "120-159k"
 df_clean$ses_revenu_grouped[df_raw$REVEN == 9] <- "160k+"
+df_clean$ses_revenu_grouped <- factor(df_clean$ses_revenu_grouped,
+  levels = c("<40k", "40-79k", "80-119k", "120-159k", "160k+"))
 table(df_clean$ses_revenu_grouped)
 
 # Transport --------------------------------------------------------------
