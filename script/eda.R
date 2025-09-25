@@ -1,5 +1,6 @@
 # Analyse exploratoire des données - Culture Carbone
 # Script d'analyse exploratoire pour data_clean.rds avec pondération
+# FOCUS: Variable dépendante 'ideal' (mode de transport idéal)
 
 # Vérifier et charger les packages nécessaires
 if (!require(ggplot2, quietly = TRUE)) install.packages("ggplot2")
@@ -32,15 +33,26 @@ if (ggplot_version >= "4.0.0") {
 data <- readRDS("_SharedFolder_culture_carbone/data/data_clean.rds")
 
 # Vérifier les poids de pondération
-cat("Résumé des poids de pondération POND:\n")
 summary(data$POND)
 
-# Créer le dossier pour les graphiques s'il n'existe pas
-if (!dir.exists("_SharedFolder_culture_carbone/graph")) {
-  dir.create("_SharedFolder_culture_carbone/graph")
-}
+# === VARIABLE DÉPENDANTE PRINCIPALE ===
 
-# === GRAPHIQUES DE DISTRIBUTION UNIVARIÉS ===
+# 0. Distribution de la variable dépendante : transport idéal (pondérée)
+p_ideal_main <- ggplot(data, aes(x = ideal, weight = POND)) +
+  geom_bar(fill = "darkgreen", alpha = 0.8) +
+  theme_fivethirtyeight(base_size = 14) +
+  labs(title = "VARIABLE DÉPENDANTE: Distribution du mode de transport idéal (pondérée)",
+       x = "Mode de transport idéal",
+       y = "Fréquence pondérée") +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+ggsave("_SharedFolder_culture_carbone/graph/MAIN_ideal_distribution.png", p_ideal_main, width = 10, height = 7)
+
+# === GRAPHIQUES DE DISTRIBUTION UNIVARIÉS DES PRÉDICTEURS ===
 
 # 1. Distribution par arrondissement (pondérée)
 p1 <- ggplot(data, aes(x = ses_arrondissement, weight = POND)) +
@@ -126,19 +138,6 @@ p6 <- ggplot(data, aes(x = main_transport, weight = POND)) +
 
 ggsave("_SharedFolder_culture_carbone/graph/dist_transport_principal.png", p6, width = 10, height = 6)
 
-# 7. Distribution du transport idéal (pondérée)
-p7 <- ggplot(data, aes(x = ideal, weight = POND)) +
-  geom_bar(fill = "darkgreen", alpha = 0.7) +
-    theme_fivethirtyeight(base_size = 14) +
-  labs(title = "Distribution du mode de transport idéal (pondérée)",
-       x = "Mode de transport idéal",
-       y = "Fréquence pondérée") +
-        theme(
-          plot.title = element_text(hjust = 0.5, face = "bold"),
-          legend.position = "bottom"
-              )
-
-ggsave("_SharedFolder_culture_carbone/graph/dist_transport_ideal.png", p7, width = 8, height = 6)
 
 # 8. Distributions des variables d'attitude (scores numériques, pondérées)
 attitude_vars <- c("ouverture_tc", "ouverture_actif", "ouverture_combine",
@@ -183,9 +182,160 @@ p_pond <- ggplot(data, aes(x = POND)) +
 
 ggsave("_SharedFolder_culture_carbone/graph/hist_ponderation.png", p_pond, width = 8, height = 6)
 
-print("Graphiques de distribution univariés PONDÉRÉS sauvegardés dans _SharedFolder_culture_carbone/graph/")
+# === GRAPHIQUES BI-VARIÉS AVEC VARIABLE DÉPENDANTE 'IDEAL' ===
 
-# === GRAPHIQUES BI-VARIÉS ===
+# PRÉDICTEURS SOCIODÉMOGRAPHIQUES vs IDEAL
+
+# 1. Transport idéal vs Arrondissement (pondéré)
+p_ideal_arr <- ggplot(data, aes(x = ses_arrondissement, fill = ideal, weight = POND)) +
+  geom_bar(position = "fill") +
+  theme_fivethirtyeight(base_size = 14) +
+  labs(title = "Transport IDÉAL par arrondissement (pondéré)",
+       x = "Arrondissement",
+       y = "Proportion pondérée",
+       fill = "Transport idéal") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold")
+  )
+
+ggsave("_SharedFolder_culture_carbone/graph/IDEAL_vs_arrondissement.png", p_ideal_arr, width = 12, height = 8)
+
+# 2. Transport idéal vs Âge (pondéré)
+p_ideal_age <- ggplot(data, aes(x = ses_age, fill = ideal, weight = POND)) +
+  geom_bar(position = "fill") +
+  theme_fivethirtyeight(base_size = 14) +
+  labs(title = "Transport IDÉAL par groupe d'âge (pondéré)",
+       x = "Groupe d'âge",
+       y = "Proportion pondérée",
+       fill = "Transport idéal") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold")
+  )
+
+ggsave("_SharedFolder_culture_carbone/graph/IDEAL_vs_age.png", p_ideal_age, width = 10, height = 6)
+
+# 3. Transport idéal vs Genre (pondéré)
+p_ideal_genre <- ggplot(data, aes(x = factor(ses_femme, labels = c("Homme", "Femme")), fill = ideal, weight = POND)) +
+  geom_bar(position = "dodge") +
+  theme_fivethirtyeight(base_size = 14) +
+  labs(title = "Transport IDÉAL par genre (pondéré)",
+       x = "Genre",
+       y = "Fréquence pondérée",
+       fill = "Transport idéal") +
+  theme(plot.title = element_text(face = "bold"))
+
+ggsave("_SharedFolder_culture_carbone/graph/IDEAL_vs_genre.png", p_ideal_genre, width = 10, height = 6)
+
+# 4. Transport idéal vs Revenus (pondéré)
+p_ideal_rev <- ggplot(data, aes(x = ses_revenu_grouped, fill = ideal, weight = POND)) +
+  geom_bar(position = "fill") +
+  theme_fivethirtyeight(base_size = 14) +
+  labs(title = "Transport IDÉAL par niveau de revenus (pondéré)",
+       x = "Revenus",
+       y = "Proportion pondérée",
+       fill = "Transport idéal") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold")
+  )
+
+ggsave("_SharedFolder_culture_carbone/graph/IDEAL_vs_revenus.png", p_ideal_rev, width = 10, height = 6)
+
+# 5. Transport idéal vs Éducation (pondéré)
+p_ideal_educ <- ggplot(data, aes(x = ses_educ, fill = ideal, weight = POND)) +
+  geom_bar(position = "fill") +
+  theme_fivethirtyeight(base_size = 14) +
+  labs(title = "Transport IDÉAL par niveau d'éducation (pondéré)",
+       x = "Éducation",
+       y = "Proportion pondérée",
+       fill = "Transport idéal") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold")
+  )
+
+ggsave("_SharedFolder_culture_carbone/graph/IDEAL_vs_education.png", p_ideal_educ, width = 12, height = 6)
+
+# 6. Transport idéal vs Propriété (pondéré)
+p_ideal_prop <- ggplot(data, aes(x = factor(ses_proprio, labels = c("Locataire", "Propriétaire")),
+                                fill = ideal, weight = POND)) +
+  geom_bar(position = "fill") +
+  theme_fivethirtyeight(base_size = 14) +
+  labs(title = "Transport IDÉAL par statut de propriété (pondéré)",
+       x = "Statut de propriété",
+       y = "Proportion pondérée",
+       fill = "Transport idéal") +
+  theme(plot.title = element_text(face = "bold"))
+
+ggsave("_SharedFolder_culture_carbone/graph/IDEAL_vs_propriete.png", p_ideal_prop, width = 8, height = 6)
+
+# ATTITUDES vs IDEAL (boxplots)
+
+# 7. Ouverture aux transports en commun vs Transport idéal
+p_ideal_tc <- ggplot(data, aes(x = ideal, y = ouverture_tc, fill = ideal)) +
+  geom_boxplot(alpha = 0.7) +
+  theme_fivethirtyeight(base_size = 14) +
+  labs(title = "Ouverture aux transports en commun par transport IDÉAL",
+       x = "Transport idéal",
+       y = "Score d'ouverture TC",
+       fill = "Transport idéal") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold")
+  )
+
+ggsave("_SharedFolder_culture_carbone/graph/IDEAL_vs_ouverture_tc.png", p_ideal_tc, width = 10, height = 6)
+
+# 8. Mobilité active vs Transport idéal
+p_ideal_mob <- ggplot(data, aes(x = ideal, y = mobilite_active, fill = ideal)) +
+  geom_boxplot(alpha = 0.7) +
+  theme_fivethirtyeight(base_size = 14) +
+  labs(title = "Attitude envers la mobilité active par transport IDÉAL",
+       x = "Transport idéal",
+       y = "Score mobilité active",
+       fill = "Transport idéal") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold")
+  )
+
+ggsave("_SharedFolder_culture_carbone/graph/IDEAL_vs_mobilite_active.png", p_ideal_mob, width = 10, height = 6)
+
+# 9. Développement durable vs Transport idéal
+p_ideal_dur <- ggplot(data, aes(x = ideal, y = dev_durable, fill = ideal)) +
+  geom_boxplot(alpha = 0.7) +
+  theme_fivethirtyeight(base_size = 14) +
+  labs(title = "Attitude envers le développement durable par transport IDÉAL",
+       x = "Transport idéal",
+       y = "Score développement durable",
+       fill = "Transport idéal") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold")
+  )
+
+ggsave("_SharedFolder_culture_carbone/graph/IDEAL_vs_dev_durable.png", p_ideal_dur, width = 10, height = 6)
+
+# TRANSPORT ACTUEL vs IDEAL
+
+# 10. Transport idéal vs Transport principal (matrice de contingence)
+p_ideal_actuel <- ggplot(data, aes(x = main_transport_3, fill = ideal, weight = POND)) +
+  geom_bar(position = "fill") +
+  theme_fivethirtyeight(base_size = 14) +
+  labs(title = "Transport IDÉAL selon le transport principal actuel (pondéré)",
+       x = "Transport principal actuel",
+       y = "Proportion pondérée",
+       fill = "Transport idéal") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold")
+  )
+
+ggsave("_SharedFolder_culture_carbone/graph/IDEAL_vs_transport_actuel.png", p_ideal_actuel, width = 10, height = 6)
+
+# === GRAPHIQUES BI-VARIÉS TRADITIONNELS (PRÉDICTEURS) ===
 
 # 1. Transport principal vs Arrondissement (pondéré)
 p_biv1 <- ggplot(data, aes(x = ses_arrondissement, fill = main_transport_3, weight = POND)) +
@@ -296,17 +446,6 @@ p_biv9 <- ggplot(data, aes(x = factor(ses_proprio, labels = c("Locataire", "Prop
 
 ggsave("_SharedFolder_culture_carbone/graph/biv_transport_propriete.png", p_biv9, width = 8, height = 6)
 
-# 10. Transport idéal vs Transport principal (pondéré)
-p_biv10 <- ggplot(data, aes(x = main_transport_3, fill = ideal, weight = POND)) +
-  geom_bar(position = "fill") +
-    theme_fivethirtyeight(base_size = 14) +
-  labs(title = "Transport idéal selon le transport principal actuel (pondéré)",
-       x = "Transport principal actuel",
-       y = "Proportion pondérée",
-       fill = "Transport idéal") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-ggsave("_SharedFolder_culture_carbone/graph/biv_transport_ideal_actuel.png", p_biv10, width = 10, height = 6)
 
 # === MATRICE DE CORRÉLATION (PONDÉRÉE) ===
 
@@ -338,22 +477,89 @@ corrplot(cor_matrix, method = "color", type = "upper", order = "hclust",
          title = "Matrice de corrélation pondérée des variables d'attitude et d'opinion")
 dev.off()
 
-# === ANALYSE MULTIVARIÉE ===
+# === ANALYSE MULTIVARIÉE AVEC VARIABLE DÉPENDANTE 'IDEAL' ===
 
-# Graphique pairs plot pour les principales variables d'attitude
+# Graphique pairs plot pour les principales variables d'attitude avec IDEAL
+attitude_subset_ideal <- data %>%
+  select(ouverture_tc, mobilite_active, dev_durable, dev_economique, ideal) %>%
+  filter(!is.na(ouverture_tc), !is.na(mobilite_active), !is.na(dev_durable), !is.na(dev_economique), !is.na(ideal))
+
+if(use_ggally) {
+  p_pairs_ideal <- ggpairs(attitude_subset_ideal,
+                           aes(color = ideal, alpha = 0.6),
+                           title = "Relations entre variables d'attitude par transport IDÉAL")
+
+  ggsave("_SharedFolder_culture_carbone/graph/IDEAL_pairs_plot_attitudes.png", p_pairs_ideal, width = 14, height = 12)
+}
+
+# Graphique pairs plot traditionnel pour comparaison
 attitude_subset <- data %>%
   select(ouverture_tc, mobilite_active, dev_durable, dev_economique, main_transport_3) %>%
   filter(!is.na(ouverture_tc), !is.na(mobilite_active), !is.na(dev_durable), !is.na(dev_economique))
 
-p_pairs <- ggpairs(attitude_subset,
-                   aes(color = main_transport_3, alpha = 0.6),
-                   title = "Relations entre les principales variables d'attitude")
+if(use_ggally) {
+  p_pairs <- ggpairs(attitude_subset,
+                     aes(color = main_transport_3, alpha = 0.6),
+                     title = "Relations entre variables d'attitude par transport ACTUEL")
 
-ggsave("_SharedFolder_culture_carbone/graph/pairs_plot_attitudes.png", p_pairs, width = 12, height = 10)
+  ggsave("_SharedFolder_culture_carbone/graph/pairs_plot_attitudes.png", p_pairs, width = 12, height = 10)
+}
 
-# === GRAPHIQUES SPÉCIALISÉS ===
+# === GRAPHIQUES SPÉCIALISÉS AVEC FOCUS SUR 'IDEAL' ===
 
-# 11. Fréquence d'utilisation du bus vs autres variables
+# Graphiques sur les opinions par transport idéal
+# 11. Opinion sur RTC par transport idéal
+p_ideal_rtc <- data %>%
+  filter(!is.na(op_rtc_num)) %>%
+  ggplot(aes(x = ideal, y = op_rtc_num, fill = ideal)) +
+  geom_boxplot(alpha = 0.7) +
+  theme_fivethirtyeight(base_size = 14) +
+  labs(title = "Opinion sur le RTC par transport IDÉAL",
+       x = "Transport idéal",
+       y = "Score opinion RTC",
+       fill = "Transport idéal") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold")
+  )
+
+ggsave("_SharedFolder_culture_carbone/graph/IDEAL_vs_opinion_rtc.png", p_ideal_rtc, width = 10, height = 6)
+
+# 12. Opinion sur vélo par transport idéal
+p_ideal_velo <- data %>%
+  filter(!is.na(op_velo_num)) %>%
+  ggplot(aes(x = ideal, y = op_velo_num, fill = ideal)) +
+  geom_boxplot(alpha = 0.7) +
+  theme_fivethirtyeight(base_size = 14) +
+  labs(title = "Opinion sur les infrastructures vélo par transport IDÉAL",
+       x = "Transport idéal",
+       y = "Score opinion vélo",
+       fill = "Transport idéal") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold")
+  )
+
+ggsave("_SharedFolder_culture_carbone/graph/IDEAL_vs_opinion_velo.png", p_ideal_velo, width = 10, height = 6)
+
+# 13. Transport idéal vs Fréquence d'utilisation du bus
+p_ideal_freq_bus <- ggplot(data, aes(x = freq_bus3, fill = ideal, weight = POND)) +
+  geom_bar(position = "fill") +
+  theme_fivethirtyeight(base_size = 14) +
+  labs(title = "Transport IDÉAL par fréquence d'utilisation du bus (pondéré)",
+       x = "Fréquence d'utilisation du bus",
+       y = "Proportion pondérée",
+       fill = "Transport idéal") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold")
+  )
+
+ggsave("_SharedFolder_culture_carbone/graph/IDEAL_vs_freq_bus.png", p_ideal_freq_bus, width = 10, height = 6)
+
+# === GRAPHIQUES SPÉCIALISÉS TRADITIONNELS ===
+
+# 14. Fréquence d'utilisation du bus vs autres variables
 # Note: Pour les boxplots, la pondération est plus complexe à implémenter avec ggplot2
 # On peut utiliser stat_boxplot avec weight, mais l'effet est limité
 p_biv11 <- ggplot(data, aes(x = freq_bus3, y = ouverture_tc, fill = freq_bus3, weight = POND)) +
@@ -403,12 +609,3 @@ p_knowledge <- grid.arrange(
 )
 
 ggsave("_SharedFolder_culture_carbone/graph/biv_connaissance_opinion.png", p_knowledge, width = 10, height = 12)
-
-print("Graphiques bi-variés et analyses multivariées PONDÉRÉS sauvegardés dans _SharedFolder_culture_carbone/graph/")
-print("Script d'analyse exploratoire PONDÉRÉE terminé!")
-cat("\n=== RÉSUMÉ DE LA PONDÉRATION ===\n")
-cat("Poids minimum:", min(data$POND, na.rm = TRUE), "\n")
-cat("Poids maximum:", max(data$POND, na.rm = TRUE), "\n")
-cat("Poids moyen:", mean(data$POND, na.rm = TRUE), "\n")
-cat("Effectif total pondéré:", sum(data$POND, na.rm = TRUE), "\n")
-cat("Effectif non pondéré:", nrow(data), "\n")
