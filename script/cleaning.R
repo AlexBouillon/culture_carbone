@@ -24,6 +24,7 @@ df_clean$ses_arrondissement[df_raw$SECT == 3] <- "Cité-Limoilou"
 df_clean$ses_arrondissement[df_raw$SECT == 4] <- "Ste-Foy-Sillery-Cap-Rouge"
 df_clean$ses_arrondissement[df_raw$SECT == 5] <- "Haute-St-Charles"
 df_clean$ses_arrondissement[df_raw$SECT == 6] <- "Les Rivières"
+df_clean$ses_arrondissement <- factor(df_clean$ses_arrondissement)
 table(df_clean$ses_arrondissement)
 
 ## age
@@ -59,6 +60,7 @@ df_clean$ses_occup[df_raw$EMPLO2 == 4] <- "Études"
 df_clean$ses_occup[df_raw$EMPLO2 == 5] <- "Études"
 df_clean$ses_occup[df_raw$EMPLO2 == 6] <- "Sans emploi"
 df_clean$ses_occup[df_raw$EMPLO2 == 7] <- "Retraite"
+df_clean$ses_occup <- factor(df_clean$ses_occup)
 table(df_clean$ses_occup)
 
 ## proprio
@@ -76,7 +78,7 @@ df_clean$ses_educ[df_raw$SCOL %in% c(3,4)] <- "Collegial/Certificat"
 df_clean$ses_educ[df_raw$SCOL == 5] <- "Bacc"
 df_clean$ses_educ[df_raw$SCOL %in% c(6,7)] <- "Graduate"
 df_clean$ses_educ <- factor(df_clean$ses_educ,
-  levels = c("Secondaire", "OccasCollegial/Certificationnel", "Bacc", "Graduate"))
+  levels = c("Secondaire", "Collegial/Certificat", "Bacc", "Graduate"))
 table(df_clean$ses_educ)
 
 ## revenu
@@ -120,6 +122,9 @@ for (q in names(modes)) {
   df_clean$second_transport[df_raw[[q]] == 2] <- modes[q]
   df_clean$third_transport[df_raw[[q]] == 3] <- modes[q]
 }
+df_clean$main_transport <- factor(df_clean$main_transport)
+df_clean$second_transport <- factor(df_clean$second_transport)
+df_clean$third_transport <- factor(df_clean$third_transport)
 table(df_clean$main_transport)
 table(df_clean$second_transport)
 table(df_clean$third_transport)
@@ -128,7 +133,13 @@ df_clean$main_transport_3 <- NA
 df_clean$main_transport_3[df_clean$main_transport %in% c("Auto conducteur","Auto passager", "Moto")] <- "Auto"
 df_clean$main_transport_3[df_clean$main_transport %in% c("Autobus","Flexibus","Taxi","Autopartage")] <- "Transport collectif"
 df_clean$main_transport_3[df_clean$main_transport %in% c("Marche","Vélo personnel","Vélo-partage")] <- "Actif"
+df_clean$main_transport_3 <- factor(df_clean$main_transport_3)
 table(df_clean$main_transport_3)
+
+df_clean$comp_transport_eco <- NA
+df_clean$comp_transport_eco[df_clean$main_transport_3 == "Auto"] <- 0
+df_clean$comp_transport_eco[df_clean$main_transport_3 %in% c("Transport collectif", "Actif")] <- 1
+table(df_clean$comp_transport_eco)
 
 table(df_raw$Q3)
 df_clean$freq_bus3 <- NA
@@ -147,8 +158,16 @@ df_clean$ideal[df_raw$Q11 == 1] <- "Auto"
 df_clean$ideal[df_raw$Q11 == 2] <- "Transport en commun"
 df_clean$ideal[df_raw$Q11 == 3] <- "Marche"
 df_clean$ideal[df_raw$Q11 == 4] <- "Vélo"
+df_clean$ideal <- factor(df_clean$ideal)
 table(df_clean$ideal)
 
+
+# Ideal_bin --------------------------------------------------------------
+
+df_clean$ideal_eco_bin <- NA
+df_clean$ideal_eco_bin[df_raw$Q11 == 1] <- 0
+df_clean$ideal_eco_bin[df_raw$Q11 %in% c(2, 3, 4)] <- 1
+table(df_clean$ideal_eco_bin)
 
 # Ouverture --------------------------------------------------------------
 table(df_raw$Q12r1)
