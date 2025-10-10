@@ -133,22 +133,18 @@ profils_map <- data_profils %>%
   ) %>%
   st_as_sf()
 
-# Créer une palette de couleurs pour les profils
+# Créer une palette de couleurs pour les 8 profils
 profil_colors <- c(
-  # Profils éco (verts)
-  "Éco normalisé" = "#2E7D32",
-  "Éco limité" = "#66BB6A",
-  "Éco résistant" = "#A5D6A7",
-  "Éco latent" = "#C8E6C9",
-  "Éco empêché" = "#E8F5E9",
-  "Éco bloqué" = "#F1F8E9",
+  # Profils éco (verts, du plus foncé au plus clair)
+  "Éco normalisé" = "#0d4711",      # Vert très foncé (répertoire élevé)
+  "Éco limité" = "#008b09",         # Vert moyen (répertoire modéré)
+  "Éco résistant" = "#00da0b",      # Vert clair (répertoire faible)
+  "Éco latent" = "#8ca38d",         # Vert très clair (potentiel non réalisé)
+  "Éco contraint" = "#78b37f",      # Vert pâle (empêché/bloqué)
   # Profils carbone (rouges/oranges)
-  "Carbone résistant" = "#C62828",
-  "Carbone normalisé modéré" = "#EF5350",
-  "Carbone normalisé" = "#E57373",
-  "Carbone adapté" = "#FFCDD2",
-  "Carbone atypique modéré" = "#FFEBEE",
-  "Carbone atypique" = "#FFF3E0"
+  "Carbone résistant" = "#8b0e0e",  # Rouge très foncé (résistance active)
+  "Carbone normalisé" = "#E57373",  # Rouge/rose moyen (cohérence carbone)
+  "Carbone atypique" = "#f7dc83"    # Orange pâle (rare, atypique)
 )
 
 # Carte A: Bulles proportionnelles
@@ -174,7 +170,7 @@ carte_A <- ggplot() +
   )
 
 # Sauvegarder
-ggsave("_SharedFolder_culture_carbone/output/carte_A_bulles_profils.png",
+ggsave("_SharedFolder_culture_carbone/graph/output/carte_A_bulles_profils.png",
        carte_A, width = 12, height = 8, dpi = 300)
 
 cat("\nCarte A sauvegardée: carte_A_bulles_profils.png\n")
@@ -203,7 +199,7 @@ carte_B <- ggplot(shp_data) +
   )
 
 # Sauvegarder
-ggsave("_SharedFolder_culture_carbone/output/carte_B_profil_dominant.png",
+ggsave("_SharedFolder_culture_carbone/graph/output/carte_B_profil_dominant.png",
        carte_B, width = 10, height = 8, dpi = 300)
 
 cat("Carte B sauvegardée: carte_B_profil_dominant.png\n")
@@ -266,7 +262,7 @@ carte_multivar <- ggplot() +
   )
 
 # Sauvegarder
-ggsave("_SharedFolder_culture_carbone/output/carte_multivar.png",
+ggsave("_SharedFolder_culture_carbone/graph/output/carte_multivar.png",
        carte_multivar, width = 12, height = 8, dpi = 300)
 
 cat("Carte multivariée sauvegardée: carte_multivar.png\n")
@@ -293,7 +289,7 @@ carte_revenu <- ggplot(shp_data) +
     panel.grid = element_blank()
   )
 
-ggsave("_SharedFolder_culture_carbone/output/carte_revenu.png",
+ggsave("_SharedFolder_culture_carbone/graph/output/carte_revenu.png",
        carte_revenu, width = 10, height = 8, dpi = 300)
 
 # 6.2 Carte de l'éducation
@@ -316,7 +312,7 @@ carte_educ <- ggplot(shp_data) +
     panel.grid = element_blank()
   )
 
-ggsave("_SharedFolder_culture_carbone/output/carte_education.png",
+ggsave("_SharedFolder_culture_carbone/graph/output/carte_education.png",
        carte_educ, width = 10, height = 8, dpi = 300)
 
 # 6.3 Carte du support au tramway
@@ -339,7 +335,7 @@ carte_tram <- ggplot(shp_data) +
     panel.grid = element_blank()
   )
 
-ggsave("_SharedFolder_culture_carbone/output/carte_tramway.png",
+ggsave("_SharedFolder_culture_carbone/graph/output/carte_tramway.png",
        carte_tram, width = 10, height = 8, dpi = 300)
 
 cat("\nToutes les cartes ont été créées avec succès!\n")

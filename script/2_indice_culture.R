@@ -74,7 +74,7 @@ data_culture <- data_culture %>%
                            ordered = TRUE)
   ) %>%
   mutate(
-    # Créer la typologie à 12 profils (2 idéaux × 3 répertoires × 2 comportements)
+    # Créer la typologie à 8 profils (regroupements pour simplification)
     profil_culture = case_when(
       # ===== PROFILS IDÉAL ÉCOLOGIQUE (ideal_eco_bin == 1) =====
 
@@ -92,11 +92,9 @@ data_culture <- data_culture %>%
       ideal_eco_bin == 1 & repertoire_cat == "Élevé" & comp_transport_eco == 0 ~
         "Éco latent",
 
-      ideal_eco_bin == 1 & repertoire_cat == "Modéré" & comp_transport_eco == 0 ~
-        "Éco empêché",
-
-      ideal_eco_bin == 1 & repertoire_cat == "Faible" & comp_transport_eco == 0 ~
-        "Éco bloqué",
+      # FUSION: Éco empêché + Éco bloqué -> Éco contraint
+      ideal_eco_bin == 1 & repertoire_cat %in% c("Modéré", "Faible") & comp_transport_eco == 0 ~
+        "Éco contraint",
 
       # ===== PROFILS IDÉAL CARBONE (ideal_eco_bin == 0) =====
 
@@ -104,20 +102,12 @@ data_culture <- data_culture %>%
       ideal_eco_bin == 0 & repertoire_cat == "Élevé" & comp_transport_eco == 0 ~
         "Carbone résistant",
 
-      ideal_eco_bin == 0 & repertoire_cat == "Modéré" & comp_transport_eco == 0 ~
-        "Carbone normalisé modéré",
-
-      ideal_eco_bin == 0 & repertoire_cat == "Faible" & comp_transport_eco == 0 ~
+      # FUSION: Carbone normalisé modéré + Carbone normalisé -> Carbone normalisé
+      ideal_eco_bin == 0 & repertoire_cat %in% c("Modéré", "Faible") & comp_transport_eco == 0 ~
         "Carbone normalisé",
 
-      # Comportement écologique
-      ideal_eco_bin == 0 & repertoire_cat == "Élevé" & comp_transport_eco == 1 ~
-        "Carbone adapté",
-
-      ideal_eco_bin == 0 & repertoire_cat == "Modéré" & comp_transport_eco == 1 ~
-        "Carbone atypique modéré",
-
-      ideal_eco_bin == 0 & repertoire_cat == "Faible" & comp_transport_eco == 1 ~
+      # FUSION: Carbone adapté + Carbone atypique modéré + Carbone atypique -> Carbone atypique
+      ideal_eco_bin == 0 & comp_transport_eco == 1 ~
         "Carbone atypique",
 
       # Cas manquants (NA dans ideal_eco_bin)
@@ -128,9 +118,9 @@ data_culture <- data_culture %>%
   mutate(
     profil_culture = factor(profil_culture,
                            levels = c("Éco normalisé", "Éco limité", "Éco résistant",
-                                     "Éco latent", "Éco empêché", "Éco bloqué",
-                                     "Carbone résistant", "Carbone normalisé modéré", "Carbone normalisé",
-                                     "Carbone adapté", "Carbone atypique modéré", "Carbone atypique"),
+                                     "Éco latent", "Éco contraint",
+                                     "Carbone résistant", "Carbone normalisé",
+                                     "Carbone atypique"),
                            ordered = FALSE)
   )
 
