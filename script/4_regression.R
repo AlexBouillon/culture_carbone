@@ -243,7 +243,7 @@ or_plot_data <- or_table %>%
       Variable == "ses_revenu_fct80-119k" ~ "80-119k$",
       Variable == "ses_revenu_fct120-159k" ~ "120-159k$",
       Variable == "ses_revenu_fct160k+" ~ "160k$+",
-      Variable == "ses_age_c" ~ "Âge (centré)",
+      Variable == "ses_age_c" ~ "Âge",
       Variable == "ses_femme_fct1" ~ "Femme",
       Variable == "ses_proprio_fct1" ~ "Propriétaire",
       grepl("ses_arrondissement_fct", Variable) ~ gsub("ses_arrondissement_fct", "", Variable),
@@ -261,20 +261,28 @@ or_plot_data <- or_table %>%
 or_plot_data <- or_plot_data %>%
   mutate(y_position = row_number())
 
+# Calculer n total et cas favorable (position >= 0.67)
+n_total_tram <- nrow(data_reg)
+n_favorable <- sum(data_reg$op_tram_num >= 0.67, na.rm = TRUE)
+pct_favorable <- (n_favorable / n_total_tram) * 100
+
+# Calculer pseudo R² (McFadden)
+null_model_ord <- polr(op_tram_ord ~ 1, data = data_reg, weights = POND, Hess = TRUE)
+pseudo_r2 <- 1 - (logLik(model_ord)[1] / logLik(null_model_ord)[1])
+
 plot_or <- ggplot(or_plot_data, aes(x = OR, y = y_position)) +
   # Ligne de référence à OR = 1
   geom_vline(xintercept = 1, linetype = "dashed", color = "grey30", linewidth = 0.8) +
-  # Barres d'erreur (IC 95%)
+  # Intervalles de confiance
   geom_errorbar(aes(xmin = CI_lower, xmax = CI_upper, color = Significant),
-                width = 0.3, linewidth = 0.9) +
+                width = 0.3, linewidth = 1) +
   # Points pour les OR
   geom_point(aes(color = Significant), size = 4) +
-  # Ajouter les valeurs numériques à droite
-  geom_text(aes(label = OR_text, x = max(CI_upper) * 1.5),
-            size = 3, hjust = 0, family = "mono") +
-  # Échelle logarithmique
-  scale_x_log10(breaks = c(0.5, 0.75, 1, 1.5, 2, 3, 4),
-                labels = c("0.5", "0.75", "1.0", "1.5", "2.0", "3.0", "4.0")) +
+  # Texte avec OR et IC
+  geom_text(aes(label = OR_text, x = max(CI_upper) * 1.8),
+            hjust = 0, size = 3, fontface = "bold") +
+  # Échelles
+  scale_x_log10(limits = c(0.1, max(or_plot_data$CI_upper) * 2.5)) +
   scale_y_continuous(breaks = or_plot_data$y_position,
                     labels = or_plot_data$Variable_display) +
   scale_color_manual(values = c("Significatif (p < 0.05)" = "#1976D2",
@@ -282,21 +290,20 @@ plot_or <- ggplot(or_plot_data, aes(x = OR, y = y_position)) +
   # Ajouter des séparateurs entre catégories
   geom_hline(yintercept = c(3.5, 7.5, 9.5, 10.5),
              linetype = "dotted", color = "grey70", linewidth = 0.5) +
-  labs(title = "Odds Ratios: Effets sur la position envers le tramway",
-       subtitle = "Modèle de régression ordinale (échelle logarithmique)\nRéférences: Secondaire, <40k$, Haute-St-Charles, Homme, Locataire",
+  labs(title = sprintf("Odds Ratios: Position envers le tramway (n=%d, %d cas favorables / %.1f%%)",
+                       n_total_tram, n_favorable, pct_favorable),
+       subtitle = sprintf("Régression ordinale (échelle logarithmique) | McFadden R² = %.3f\nRéférences: Secondaire, <40k$, Haute-St-Charles, Homme, Locataire", pseudo_r2),
        x = "Odds Ratio (IC à 95%)",
        y = "",
        color = "") +
   coord_cartesian(clip = "off") +
-  theme_minimal() +
+  theme_minimal(base_size = 11) +
   theme(
-    plot.title = element_text(face = "bold", size = 14, margin = margin(b = 5)),
-    plot.subtitle = element_text(size = 10, color = "grey40", margin = margin(b = 15)),
-    axis.text.y = element_text(size = 10, hjust = 1),
-    axis.text.x = element_text(size = 10),
-    axis.title.x = element_text(size = 11, face = "bold", margin = margin(t = 10)),
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(size = 9, color = "grey40", margin = margin(b = 15)),
     legend.position = "bottom",
-    legend.text = element_text(size = 10),
+    axis.text.y = element_text(hjust = 1),
+    axis.title.x = element_text(margin = margin(t = 10)),
     panel.grid.major.y = element_blank(),
     panel.grid.minor = element_blank(),
     panel.grid.major.x = element_line(color = "grey90", linewidth = 0.5),
@@ -304,7 +311,7 @@ plot_or <- ggplot(or_plot_data, aes(x = OR, y = y_position)) +
   )
 
 ggsave("_SharedFolder_culture_carbone/graph/output/odds_ratios_tramway.png",
-       plot_or, width = 10, height = 6, dpi = 300)
+       plot_or, width = 10, height = 7, dpi = 300)
 
 cat("Graphique sauvegardé: odds_ratios_tramway.png\n")
 

@@ -342,6 +342,177 @@ p4 <- ggplot(repertoire_arrond, aes(x = reorder(Arrondissement, repertoire_moyen
 ggsave("repertoire_arrondissement.png", p4, width = 10, height = 7, dpi = 300)
 cat("Graphique sauvegardé: repertoire_arrondissement.png\n")
 
+# Graphique 5: Forest plots des odds ratios (style 4_regression.R)
+# Créer 3 forest plots séparés, un par profil culturel
+
+# Extraire les coefficients et calculer les odds ratios
+coefs <- summary(model_profils)$coefficients
+std_errors <- summary(model_profils)$standard.errors
+
+# Fonction pour créer un forest plot pour un profil donné
+create_forest_plot <- function(profil_name, color_profil, model_obj, n_total, n_profil) {
+
+  # Extraire les coefficients pour ce profil
+  coef_profil <- coefs[profil_name, ]
+  se_profil <- std_errors[profil_name, ]
+
+  # Exclure l'intercept
+  coef_profil <- coef_profil[-1]
+  se_profil <- se_profil[-1]
+
+  # Calculer OR et IC 95%
+  or_data <- data.frame(
+    Variable_raw = names(coef_profil),
+    OR = exp(coef_profil),
+    CI_lower = exp(coef_profil - 1.96 * se_profil),
+    CI_upper = exp(coef_profil + 1.96 * se_profil)
+  ) %>%
+    mutate(
+      Significant = ifelse(CI_lower > 1 | CI_upper < 1, "Significatif (p < 0.05)", "Non significatif"),
+
+      # Catégorisation des variables
+      Category = case_when(
+        grepl("educ", Variable_raw) ~ "Éducation",
+        grepl("revenu", Variable_raw) ~ "Revenu",
+        grepl("arrondissement", Variable_raw) ~ "Géographie",
+        TRUE ~ "Contrôles"
+      ),
+
+      # Ordre pour tri dans chaque catégorie
+      Order = case_when(
+        Variable_raw == "ses_educ_fctCollegial/Certificat" ~ 1,
+        Variable_raw == "ses_educ_fctBacc" ~ 2,
+        Variable_raw == "ses_educ_fctGraduate" ~ 3,
+        Variable_raw == "ses_revenu_fct40-79k" ~ 1,
+        Variable_raw == "ses_revenu_fct80-119k" ~ 2,
+        Variable_raw == "ses_revenu_fct120-159k" ~ 3,
+        Variable_raw == "ses_revenu_fct160k+" ~ 4,
+        Variable_raw == "ses_arrondissement_fctBeauport" ~ 1,
+        Variable_raw == "ses_arrondissement_fctCharlesbourg" ~ 2,
+        Variable_raw == "ses_arrondissement_fctCité-Limoilou" ~ 3,
+        Variable_raw == "ses_arrondissement_fctLes Rivières" ~ 4,
+        Variable_raw == "ses_arrondissement_fctSte-Foy-Sillery-Cap-Rouge" ~ 5,
+        Variable_raw == "ses_age_c" ~ 1,
+        Variable_raw == "ses_femme_fct1" ~ 2,
+        Variable_raw == "ses_proprio_fct1" ~ 3,
+        TRUE ~ 99
+      ),
+
+      # Noms lisibles
+      Variable_display = case_when(
+        Variable_raw == "ses_educ_fctCollegial/Certificat" ~ "Collégial/Certificat",
+        Variable_raw == "ses_educ_fctBacc" ~ "Bacc",
+        Variable_raw == "ses_educ_fctGraduate" ~ "Graduate",
+        Variable_raw == "ses_revenu_fct40-79k" ~ "40-79k$",
+        Variable_raw == "ses_revenu_fct80-119k" ~ "80-119k$",
+        Variable_raw == "ses_revenu_fct120-159k" ~ "120-159k$",
+        Variable_raw == "ses_revenu_fct160k+" ~ "160k$+",
+        Variable_raw == "ses_arrondissement_fctBeauport" ~ "Beauport",
+        Variable_raw == "ses_arrondissement_fctCharlesbourg" ~ "Charlesbourg",
+        Variable_raw == "ses_arrondissement_fctCité-Limoilou" ~ "Cité-Limoilou",
+        Variable_raw == "ses_arrondissement_fctLes Rivières" ~ "Les Rivières",
+        Variable_raw == "ses_arrondissement_fctSte-Foy-Sillery-Cap-Rouge" ~ "Ste-Foy-Sillery-Cap-Rouge",
+        Variable_raw == "ses_age_c" ~ "Âge",
+        Variable_raw == "ses_femme_fct1" ~ "Femme",
+        Variable_raw == "ses_proprio_fct1" ~ "Propriétaire",
+        TRUE ~ Variable_raw
+      ),
+
+      # Ajouter le nom de catégorie pour l'affichage
+      Category_num = case_when(
+        Category == "Éducation" ~ 4,
+        Category == "Revenu" ~ 3,
+        Category == "Géographie" ~ 2,
+        Category == "Contrôles" ~ 1
+      ),
+
+      # Texte pour afficher OR et IC
+      OR_text = sprintf("%.2f [%.2f-%.2f]", OR, CI_lower, CI_upper)
+    ) %>%
+    arrange(desc(Category_num), Order)
+
+  # Créer position y
+  or_data <- or_data %>%
+    mutate(y_position = n():1)
+
+  # Calculer pseudo R² (McFadden pour multinomial)
+  # McFadden R² = 1 - (logLik(model) / logLik(null_model))
+  null_model <- multinom(profil_simple ~ 1, data = data_reg, weights = POND, trace = FALSE)
+  pseudo_r2 <- 1 - (logLik(model_obj)[1] / logLik(null_model)[1])
+
+  # Pourcentage du profil
+  pct_profil <- (n_profil / n_total) * 100
+
+  # Créer le plot
+  plot_or <- ggplot(or_data, aes(x = OR, y = y_position)) +
+    # Ligne de référence à OR = 1
+    geom_vline(xintercept = 1, linetype = "dashed", color = "grey30", linewidth = 0.8) +
+    # Intervalles de confiance
+    geom_errorbar(aes(xmin = CI_lower, xmax = CI_upper, color = Significant),
+                  width = 0.3, linewidth = 1) +
+    # Points pour les OR
+    geom_point(aes(color = Significant), size = 4) +
+    # Texte avec OR et IC
+    geom_text(aes(label = OR_text, x = max(CI_upper) * 1.8),
+              hjust = 0, size = 3, fontface = "bold") +
+
+    # Échelles
+    scale_x_log10(limits = c(0.1, max(or_data$CI_upper) * 2.5)) +
+    scale_y_continuous(breaks = or_data$y_position,
+                      labels = or_data$Variable_display) +
+    scale_color_manual(values = c("Significatif (p < 0.05)" = color_profil,
+                                  "Non significatif" = "grey60")) +
+
+    # Ajouter des séparateurs entre catégories
+    geom_hline(yintercept = c(max(or_data$y_position[or_data$Category == "Contrôles"]) + 0.5,
+                              max(or_data$y_position[or_data$Category == "Géographie"]) + 0.5,
+                              max(or_data$y_position[or_data$Category == "Revenu"]) + 0.5),
+               linetype = "dotted", color = "grey70", linewidth = 0.5) +
+
+    labs(title = sprintf("Odds Ratios: %s (vs Carbone aligné) | n=%d, %d cas / %.1f%%",
+                         profil_name, n_total, n_profil, pct_profil),
+         subtitle = sprintf("Régression multinomiale (échelle logarithmique) | McFadden R² = %.3f\nRéférences: Secondaire, <40k$, Haute-St-Charles, Homme, Locataire", pseudo_r2),
+         x = "Odds Ratio (IC à 95%)",
+         y = "",
+         color = "") +
+    coord_cartesian(clip = "off") +
+    theme_minimal(base_size = 11) +
+    theme(
+      plot.title = element_text(face = "bold", size = 13),
+      plot.subtitle = element_text(size = 9, color = "grey40", margin = margin(b = 15)),
+      legend.position = "bottom",
+      axis.text.y = element_text(hjust = 1),
+      axis.title.x = element_text(margin = margin(t = 10)),
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.x = element_line(color = "grey90", linewidth = 0.5),
+      plot.margin = margin(10, 80, 10, 10)
+    )
+
+  return(plot_or)
+}
+
+# Calculer n et cas pour chaque profil
+n_total_profils <- nrow(data_reg)
+n_eco_aligne <- sum(data_reg$profil_simple == "Éco aligné", na.rm = TRUE)
+n_eco_contraint <- sum(data_reg$profil_simple == "Éco contraint", na.rm = TRUE)
+n_carbone_atypique <- sum(data_reg$profil_simple == "Carbone atypique", na.rm = TRUE)
+
+# Créer les 3 forest plots
+p5a <- create_forest_plot("Éco aligné", "#2E7D32", model_profils, n_total_profils, n_eco_aligne)
+p5b <- create_forest_plot("Éco contraint", "#FFA726", model_profils, n_total_profils, n_eco_contraint)
+p5c <- create_forest_plot("Carbone atypique", "#9C27B0", model_profils, n_total_profils, n_carbone_atypique)
+
+# Sauvegarder les graphiques
+ggsave("odds_ratios_eco_aligne.png", p5a, width = 10, height = 7, dpi = 300)
+cat("Graphique sauvegardé: odds_ratios_eco_aligne.png\n")
+
+ggsave("odds_ratios_eco_contraint.png", p5b, width = 10, height = 7, dpi = 300)
+cat("Graphique sauvegardé: odds_ratios_eco_contraint.png\n")
+
+ggsave("odds_ratios_carbone_atypique.png", p5c, width = 10, height = 7, dpi = 300)
+cat("Graphique sauvegardé: odds_ratios_carbone_atypique.png\n")
+
 # ====================================================================
 # 6. SAUVEGARDE DES DONNÉES
 # ====================================================================
@@ -360,7 +531,7 @@ cat("✓ Répertoire écologique analysé comme prédicteur\n")
 cat("✓ Régressions multinomiales complétées\n")
 cat("✓ Test d'interaction éducation × arrondissement\n")
 cat("✓ Probabilités prédites calculées\n")
-cat("✓ 4 graphiques générés\n\n")
+cat("✓ 7 graphiques générés\n\n")
 
 cat("FICHIERS GÉNÉRÉS:\n")
 cat("-----------------\n")
@@ -368,6 +539,9 @@ cat("- profils_education.png\n")
 cat("- profils_arrondissement.png\n")
 cat("- repertoire_par_profil.png\n")
 cat("- repertoire_arrondissement.png\n")
+cat("- odds_ratios_eco_aligne.png\n")
+cat("- odds_ratios_eco_contraint.png\n")
+cat("- odds_ratios_carbone_atypique.png\n")
 cat("- data_culture_v2.rds\n\n")
 
 cat("PRINCIPAUX RÉSULTATS:\n")
