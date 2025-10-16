@@ -1,6 +1,7 @@
 library(dplyr)
 library(ggplot2)
 library(broom)
+library(marginaleffects)
 
 # ====================================================================
 # RÉGRESSIONS COMPLÉMENTAIRES
@@ -59,20 +60,29 @@ model_ideal <- glm(ideal_eco_bin ~ ses_educ_fct + ses_revenu_fct + ses_age_c +
 
 summary(model_ideal)
 
-# Calculer odds ratios et IC 95%
-cat("\n--- Odds Ratios et IC 95% ---\n")
-coefs_ideal <- coef(model_ideal)
-ci_ideal <- confint(model_ideal)
+# Calculer Average Marginal Effects
+cat("\n--- Average Marginal Effects et IC 95% ---\n")
 
-or_ideal <- data.frame(
-  Variable_raw = names(coefs_ideal),
-  OR = exp(coefs_ideal),
-  CI_lower = exp(ci_ideal[, 1]),
-  CI_upper = exp(ci_ideal[, 2]),
-  p_value = coef(summary(model_ideal))[, "Pr(>|z|)"]
-)
+ame_ideal <- avg_comparisons(model_ideal,
+                             variables = list(
+                               ses_educ_fct = "reference",
+                               ses_revenu_fct = "reference",
+                               ses_arrondissement_fct = "reference",
+                               ses_age_c = "sd",
+                               ses_femme_fct = "reference",
+                               ses_proprio_fct = "reference"
+                             ),
+                             type = "response")
 
-print(or_ideal)
+ame_ideal_table <- ame_ideal %>%
+  mutate(
+    AME = estimate * 100,  # Points de pourcentage
+    CI_lower = conf.low * 100,
+    CI_upper = conf.high * 100
+  ) %>%
+  dplyr::select(term, contrast, AME, CI_lower, CI_upper, p.value)
+
+print(ame_ideal_table)
 
 # ====================================================================
 # 4. MODÈLE 2: COMPORTEMENT ÉCOLOGIQUE
@@ -92,77 +102,85 @@ model_comp <- glm(comp_transport_eco ~ ses_educ_fct + ses_revenu_fct + ses_age_c
 
 summary(model_comp)
 
-# Calculer odds ratios et IC 95%
-cat("\n--- Odds Ratios et IC 95% ---\n")
-coefs_comp <- coef(model_comp)
-ci_comp <- confint(model_comp)
+# Calculer Average Marginal Effects
+cat("\n--- Average Marginal Effects et IC 95% ---\n")
 
-or_comp <- data.frame(
-  Variable_raw = names(coefs_comp),
-  OR = exp(coefs_comp),
-  CI_lower = exp(ci_comp[, 1]),
-  CI_upper = exp(ci_comp[, 2]),
-  p_value = coef(summary(model_comp))[, "Pr(>|z|)"]
-)
+ame_comp <- avg_comparisons(model_comp,
+                            variables = list(
+                              ses_educ_fct = "reference",
+                              ses_revenu_fct = "reference",
+                              ses_arrondissement_fct = "reference",
+                              ses_age_c = "sd",
+                              ses_femme_fct = "reference",
+                              ses_proprio_fct = "reference"
+                            ),
+                            type = "response")
 
-print(or_comp)
+ame_comp_table <- ame_comp %>%
+  mutate(
+    AME = estimate * 100,  # Points de pourcentage
+    CI_lower = conf.low * 100,
+    CI_upper = conf.high * 100
+  ) %>%
+  dplyr::select(term, contrast, AME, CI_lower, CI_upper, p.value)
+
+print(ame_comp_table)
 
 # ====================================================================
 # 5. FONCTION POUR CRÉER FOREST PLOTS
 # ====================================================================
 
-create_forest_plot <- function(or_data, title_text, color_sig, model_obj, n_total, n_events) {
+create_forest_plot <- function(ame_data, title_text, color_sig, model_obj, n_total, n_events) {
 
-  # Exclure intercept et préparer les données
-  plot_data <- or_data %>%
-    filter(Variable_raw != "(Intercept)") %>%
+  # Préparer les données pour le graphique
+  plot_data <- ame_data %>%
     mutate(
       # Catégorisation
       Category = case_when(
-        grepl("educ", Variable_raw) ~ "Éducation",
-        grepl("revenu", Variable_raw) ~ "Revenu",
-        grepl("arrondissement", Variable_raw) ~ "Géographie",
+        grepl("educ", term) ~ "Éducation",
+        grepl("revenu", term) ~ "Revenu",
+        grepl("arrondissement", term) ~ "Géographie",
         TRUE ~ "Contrôles"
+      ),
+
+      # Extraire le niveau de la variable à partir du contrast
+      Variable_display = case_when(
+        grepl("Collegial", contrast) ~ "Collégial/Certificat",
+        grepl("Bacc", contrast) & !grepl("Graduate", contrast) ~ "Bacc",
+        grepl("Graduate", contrast) ~ "Graduate",
+        grepl("40-79k", contrast) ~ "40-79k$",
+        grepl("80-119k", contrast) ~ "80-119k$",
+        grepl("120-159k", contrast) ~ "120-159k$",
+        grepl("160k", contrast) ~ "160k$+",
+        grepl("Beauport", contrast) ~ "Beauport",
+        grepl("Charlesbourg", contrast) ~ "Charlesbourg",
+        grepl("Cité-Limoilou", contrast) ~ "Cité-Limoilou",
+        grepl("Les Rivières", contrast) ~ "Les Rivières",
+        grepl("Ste-Foy", contrast) ~ "Ste-Foy-Sillery-Cap-Rouge",
+        grepl("age", term) ~ "Âge (+1 SD)",
+        grepl("femme", term) ~ "Femme",
+        grepl("proprio", term) ~ "Propriétaire",
+        TRUE ~ as.character(contrast)
       ),
 
       # Ordre
       Order = case_when(
-        Variable_raw == "ses_educ_fctCollegial/Certificat" ~ 1,
-        Variable_raw == "ses_educ_fctBacc" ~ 2,
-        Variable_raw == "ses_educ_fctGraduate" ~ 3,
-        Variable_raw == "ses_revenu_fct40-79k" ~ 1,
-        Variable_raw == "ses_revenu_fct80-119k" ~ 2,
-        Variable_raw == "ses_revenu_fct120-159k" ~ 3,
-        Variable_raw == "ses_revenu_fct160k+" ~ 4,
-        Variable_raw == "ses_arrondissement_fctBeauport" ~ 1,
-        Variable_raw == "ses_arrondissement_fctCharlesbourg" ~ 2,
-        Variable_raw == "ses_arrondissement_fctCité-Limoilou" ~ 3,
-        Variable_raw == "ses_arrondissement_fctLes Rivières" ~ 4,
-        Variable_raw == "ses_arrondissement_fctSte-Foy-Sillery-Cap-Rouge" ~ 5,
-        Variable_raw == "ses_age_c" ~ 1,
-        Variable_raw == "ses_femme_fct1" ~ 2,
-        Variable_raw == "ses_proprio_fct1" ~ 3,
+        Variable_display == "Collégial/Certificat" ~ 1,
+        Variable_display == "Bacc" ~ 2,
+        Variable_display == "Graduate" ~ 3,
+        Variable_display == "40-79k$" ~ 1,
+        Variable_display == "80-119k$" ~ 2,
+        Variable_display == "120-159k$" ~ 3,
+        Variable_display == "160k$+" ~ 4,
+        Variable_display == "Beauport" ~ 1,
+        Variable_display == "Charlesbourg" ~ 2,
+        Variable_display == "Cité-Limoilou" ~ 3,
+        Variable_display == "Les Rivières" ~ 4,
+        Variable_display == "Ste-Foy-Sillery-Cap-Rouge" ~ 5,
+        Variable_display == "Âge (+1 SD)" ~ 1,
+        Variable_display == "Femme" ~ 2,
+        Variable_display == "Propriétaire" ~ 3,
         TRUE ~ 99
-      ),
-
-      # Noms lisibles
-      Variable_display = case_when(
-        Variable_raw == "ses_educ_fctCollegial/Certificat" ~ "Collégial/Certificat",
-        Variable_raw == "ses_educ_fctBacc" ~ "Bacc",
-        Variable_raw == "ses_educ_fctGraduate" ~ "Graduate",
-        Variable_raw == "ses_revenu_fct40-79k" ~ "40-79k$",
-        Variable_raw == "ses_revenu_fct80-119k" ~ "80-119k$",
-        Variable_raw == "ses_revenu_fct120-159k" ~ "120-159k$",
-        Variable_raw == "ses_revenu_fct160k+" ~ "160k$+",
-        Variable_raw == "ses_arrondissement_fctBeauport" ~ "Beauport",
-        Variable_raw == "ses_arrondissement_fctCharlesbourg" ~ "Charlesbourg",
-        Variable_raw == "ses_arrondissement_fctCité-Limoilou" ~ "Cité-Limoilou",
-        Variable_raw == "ses_arrondissement_fctLes Rivières" ~ "Les Rivières",
-        Variable_raw == "ses_arrondissement_fctSte-Foy-Sillery-Cap-Rouge" ~ "Ste-Foy-Sillery-Cap-Rouge",
-        Variable_raw == "ses_age_c" ~ "Âge",
-        Variable_raw == "ses_femme_fct1" ~ "Femme",
-        Variable_raw == "ses_proprio_fct1" ~ "Propriétaire",
-        TRUE ~ Variable_raw
       ),
 
       Category_num = case_when(
@@ -172,8 +190,8 @@ create_forest_plot <- function(or_data, title_text, color_sig, model_obj, n_tota
         Category == "Contrôles" ~ 1
       ),
 
-      Significant = ifelse(p_value < 0.05, "Significatif (p < 0.05)", "Non significatif"),
-      OR_text = sprintf("%.2f [%.2f-%.2f]", OR, CI_lower, CI_upper)
+      Significant = ifelse(p.value < 0.05, "Significatif (p < 0.05)", "Non significatif"),
+      AME_text = sprintf("%.1f [%.1f, %.1f]", AME, CI_lower, CI_upper)
     ) %>%
     arrange(desc(Category_num), Order) %>%
     mutate(y_position = n():1)
@@ -188,14 +206,15 @@ create_forest_plot <- function(or_data, title_text, color_sig, model_obj, n_tota
   pct_events <- (n_events / n_total) * 100
 
   # Créer le graphique
-  p <- ggplot(plot_data, aes(x = OR, y = y_position)) +
-    geom_vline(xintercept = 1, linetype = "dashed", color = "grey30", linewidth = 0.8) +
+  p <- ggplot(plot_data, aes(x = AME, y = y_position)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey30", linewidth = 0.8) +
     geom_errorbar(aes(xmin = CI_lower, xmax = CI_upper, color = Significant),
                   width = 0.3, linewidth = 1) +
     geom_point(aes(color = Significant), size = 4) +
-    geom_text(aes(label = OR_text, x = max(CI_upper) * 1.8),
+    geom_text(aes(label = AME_text, x = max(CI_upper, na.rm = TRUE) + 5),
               hjust = 0, size = 3, fontface = "bold") +
-    scale_x_log10(limits = c(0.1, max(plot_data$CI_upper) * 2.5)) +
+    scale_x_continuous(limits = c(min(plot_data$CI_lower, na.rm = TRUE) - 5,
+                                  max(plot_data$CI_upper, na.rm = TRUE) + 20)) +
     scale_y_continuous(breaks = plot_data$y_position,
                       labels = plot_data$Variable_display) +
     scale_color_manual(values = c("Significatif (p < 0.05)" = color_sig,
@@ -205,8 +224,8 @@ create_forest_plot <- function(or_data, title_text, color_sig, model_obj, n_tota
                               max(plot_data$y_position[plot_data$Category == "Revenu"]) + 0.5),
                linetype = "dotted", color = "grey70", linewidth = 0.5) +
     labs(title = sprintf("%s (n=%d, %d cas / %.1f%%)", title_text, n_total, n_events, pct_events),
-         subtitle = sprintf("Régression logistique (échelle logarithmique) | McFadden R² = %.3f\nRéférences: Secondaire, <40k$, Haute-St-Charles, Homme, Locataire", pseudo_r2),
-         x = "Odds Ratio (IC à 95%)",
+         subtitle = sprintf("Changement de probabilité en points de pourcentage | McFadden R² = %.3f\nRéférences: Secondaire, <40k$, Haute-St-Charles, Homme, Locataire", pseudo_r2),
+         x = "Changement de probabilité (points de %)",
          y = "",
          color = "") +
     coord_cartesian(clip = "off") +
@@ -240,26 +259,26 @@ n_ideal_eco <- sum(data_reg$ideal_eco_bin, na.rm = TRUE)
 n_comp_eco <- sum(data_reg$comp_transport_eco, na.rm = TRUE)
 
 # Graphique 1: Idéal écologique
-p1 <- create_forest_plot(or_ideal,
-                         "Odds Ratios: Idéal écologique",
+p1 <- create_forest_plot(ame_ideal_table,
+                         "Effets marginaux: Idéal écologique",
                          "#1976D2",
                          model_ideal,
                          n_total,
                          n_ideal_eco)
 
-ggsave("odds_ratios_ideal_eco.png", p1, width = 10, height = 7, dpi = 300)
-cat("Graphique sauvegardé: odds_ratios_ideal_eco.png\n")
+ggsave("marginal_effects_ideal_eco.png", p1, width = 10, height = 7, dpi = 300)
+cat("Graphique sauvegardé: marginal_effects_ideal_eco.png\n")
 
 # Graphique 2: Comportement écologique
-p2 <- create_forest_plot(or_comp,
-                         "Odds Ratios: Comportement écologique",
+p2 <- create_forest_plot(ame_comp_table,
+                         "Effets marginaux: Comportement écologique",
                          "#FF6F00",
                          model_comp,
                          n_total,
                          n_comp_eco)
 
-ggsave("odds_ratios_comportement_eco.png", p2, width = 10, height = 7, dpi = 300)
-cat("Graphique sauvegardé: odds_ratios_comportement_eco.png\n")
+ggsave("marginal_effects_comportement_eco.png", p2, width = 10, height = 7, dpi = 300)
+cat("Graphique sauvegardé: marginal_effects_comportement_eco.png\n")
 
 # ====================================================================
 # 7. COMPARAISON DES DEUX MODÈLES
@@ -270,23 +289,22 @@ cat("COMPARAISON IDÉAL vs COMPORTEMENT\n")
 cat("========================================\n\n")
 
 # Tableau comparatif
-comparison <- or_ideal %>%
-  dplyr::select(Variable_raw, OR_ideal = OR, p_ideal = p_value) %>%
+comparison <- ame_ideal_table %>%
+  dplyr::select(term, contrast, AME_ideal = AME, p_ideal = p.value) %>%
   left_join(
-    or_comp %>% dplyr::select(Variable_raw, OR_comp = OR, p_comp = p_value),
-    by = "Variable_raw"
+    ame_comp_table %>% dplyr::select(term, contrast, AME_comp = AME, p_comp = p.value),
+    by = c("term", "contrast")
   ) %>%
-  filter(Variable_raw != "(Intercept)") %>%
   mutate(
-    Diff_OR = OR_ideal - OR_comp,
+    Diff_AME = AME_ideal - AME_comp,
     Sig_ideal = ifelse(p_ideal < 0.05, "***", ""),
     Sig_comp = ifelse(p_comp < 0.05, "***", "")
   )
 
 cat("Prédicteurs avec effets différents sur idéal vs comportement:\n\n")
 print(comparison %>%
-        filter(abs(Diff_OR) > 0.5 | (p_ideal < 0.05 & p_comp >= 0.05) | (p_ideal >= 0.05 & p_comp < 0.05)) %>%
-        dplyr::select(Variable_raw, OR_ideal, Sig_ideal, OR_comp, Sig_comp, Diff_OR))
+        filter(abs(Diff_AME) > 5 | (p_ideal < 0.05 & p_comp >= 0.05) | (p_ideal >= 0.05 & p_comp < 0.05)) %>%
+        dplyr::select(term, contrast, AME_ideal, Sig_ideal, AME_comp, Sig_comp, Diff_AME))
 
 cat("\n\n========================================\n")
 cat("COMPARAISON IDÉAL vs COMPORTEMENT: TERMINÉE\n")
@@ -680,23 +698,26 @@ if (!"repertoire_eco" %in% names(data_reg)) {
   # 11. FOREST PLOT COMPARATIF: ARRONDISSEMENT VS RÉPERTOIRE
   # ====================================================================
 
+  # NOTE: Cette section a été commentée car elle utilisait les odds ratios
+  # Pour une version avec marginal effects, il faudrait recalculer les AME
+  # pour le modèle avec répertoire
+
   cat("\n========================================\n")
-  cat("FOREST PLOT COMPARATIF\n")
+  cat("NOTE: Forest plot comparatif désactivé\n")
+  cat("(conversion aux marginal effects en cours)\n")
   cat("========================================\n\n")
 
-  # 11.1 Préparer les données pour le forest plot avec répertoire
+  # Code commenté - à adapter pour marginal effects si nécessaire
+  # or_comp_rep_full <- data.frame(
+  #   Variable_raw = names(coef(model_comp_rep)),
+  #   OR = exp(coef(model_comp_rep)),
+  #   CI_lower = exp(confint(model_comp_rep)[, 1]),
+  #   CI_upper = exp(confint(model_comp_rep)[, 2]),
+  #   p_value = coef(summary(model_comp_rep))[, "Pr(>|z|)"]
+  # )
 
-  # Obtenir OR et IC pour le modèle avec répertoire
-  or_comp_rep_full <- data.frame(
-    Variable_raw = names(coef(model_comp_rep)),
-    OR = exp(coef(model_comp_rep)),
-    CI_lower = exp(confint(model_comp_rep)[, 1]),
-    CI_upper = exp(confint(model_comp_rep)[, 2]),
-    p_value = coef(summary(model_comp_rep))[, "Pr(>|z|)"]
-  )
-
-  # Préparer données arrondissement (déjà existant: or_comp)
-  plot_data_arrond <- or_comp %>%
+  if (FALSE) {  # Désactiver temporairement cette section
+  plot_data_arrond <- ame_comp_table %>%
     filter(Variable_raw != "(Intercept)") %>%
     mutate(
       Modele = "Arrondissement (5 df)",
@@ -850,7 +871,8 @@ if (!"repertoire_eco" %in% names(data_reg)) {
 
   ggsave("forest_plot_arrond_vs_repertoire.png", p_comp_forest, width = 14, height = 8, dpi = 300)
   cat("Graphique sauvegardé: forest_plot_arrond_vs_repertoire.png\n\n")
-}
+  }  # Fin du if (FALSE)
+}  # Fin du if (!"repertoire_eco" %in% names(data_reg))
 
 cat("\n\n========================================\n")
 cat("ANALYSE COMPLÈTE TERMINÉE\n")

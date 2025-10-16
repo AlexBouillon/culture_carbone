@@ -1,7 +1,7 @@
 library(dplyr)
 library(nnet)
-library(marginaleffects)
 library(ggplot2)
+library(marginaleffects)
 
 # Charger les données
 data_culture <- readRDS("_SharedFolder_culture_carbone/data/data_culture.rds")
@@ -352,73 +352,76 @@ std_errors <- summary(model_profils)$standard.errors
 # Fonction pour créer un forest plot pour un profil donné
 create_forest_plot <- function(profil_name, color_profil, model_obj, n_total, n_profil) {
 
-  # Extraire les coefficients pour ce profil
-  coef_profil <- coefs[profil_name, ]
-  se_profil <- std_errors[profil_name, ]
+  # Calculer les AME pour ce profil spécifique
+  ame_profil <- avg_comparisons(model_obj,
+                                variables = list(
+                                  ses_educ_fct = "reference",
+                                  ses_revenu_fct = "reference",
+                                  ses_arrondissement_fct = "reference",
+                                  ses_age_c = "sd",
+                                  ses_femme_fct = "reference",
+                                  ses_proprio_fct = "reference"
+                                ),
+                                type = "probs",
+                                by = "group") %>%
+    filter(group == profil_name)
 
-  # Exclure l'intercept
-  coef_profil <- coef_profil[-1]
-  se_profil <- se_profil[-1]
-
-  # Calculer OR et IC 95%
-  or_data <- data.frame(
-    Variable_raw = names(coef_profil),
-    OR = exp(coef_profil),
-    CI_lower = exp(coef_profil - 1.96 * se_profil),
-    CI_upper = exp(coef_profil + 1.96 * se_profil)
-  ) %>%
+  # Préparer les données
+  ame_data <- ame_profil %>%
     mutate(
-      Significant = ifelse(CI_lower > 1 | CI_upper < 1, "Significatif (p < 0.05)", "Non significatif"),
+      AME = estimate * 100,  # Points de pourcentage
+      CI_lower = conf.low * 100,
+      CI_upper = conf.high * 100,
+      Significant = ifelse(p.value < 0.05, "Significatif (p < 0.05)", "Non significatif"),
 
       # Catégorisation des variables
       Category = case_when(
-        grepl("educ", Variable_raw) ~ "Éducation",
-        grepl("revenu", Variable_raw) ~ "Revenu",
-        grepl("arrondissement", Variable_raw) ~ "Géographie",
+        grepl("educ", term) ~ "Éducation",
+        grepl("revenu", term) ~ "Revenu",
+        grepl("arrondissement", term) ~ "Géographie",
         TRUE ~ "Contrôles"
+      ),
+
+      # Extraire le niveau de la variable à partir du contrast
+      Variable_display = case_when(
+        grepl("Collegial", contrast) ~ "Collégial/Certificat",
+        grepl("Bacc", contrast) & !grepl("Graduate", contrast) ~ "Bacc",
+        grepl("Graduate", contrast) ~ "Graduate",
+        grepl("40-79k", contrast) ~ "40-79k$",
+        grepl("80-119k", contrast) ~ "80-119k$",
+        grepl("120-159k", contrast) ~ "120-159k$",
+        grepl("160k", contrast) ~ "160k$+",
+        grepl("Beauport", contrast) ~ "Beauport",
+        grepl("Charlesbourg", contrast) ~ "Charlesbourg",
+        grepl("Cité-Limoilou", contrast) ~ "Cité-Limoilou",
+        grepl("Les Rivières", contrast) ~ "Les Rivières",
+        grepl("Ste-Foy", contrast) ~ "Ste-Foy-Sillery-Cap-Rouge",
+        grepl("age", term) ~ "Âge (+1 SD)",
+        grepl("femme", term) ~ "Femme",
+        grepl("proprio", term) ~ "Propriétaire",
+        TRUE ~ as.character(contrast)
       ),
 
       # Ordre pour tri dans chaque catégorie
       Order = case_when(
-        Variable_raw == "ses_educ_fctCollegial/Certificat" ~ 1,
-        Variable_raw == "ses_educ_fctBacc" ~ 2,
-        Variable_raw == "ses_educ_fctGraduate" ~ 3,
-        Variable_raw == "ses_revenu_fct40-79k" ~ 1,
-        Variable_raw == "ses_revenu_fct80-119k" ~ 2,
-        Variable_raw == "ses_revenu_fct120-159k" ~ 3,
-        Variable_raw == "ses_revenu_fct160k+" ~ 4,
-        Variable_raw == "ses_arrondissement_fctBeauport" ~ 1,
-        Variable_raw == "ses_arrondissement_fctCharlesbourg" ~ 2,
-        Variable_raw == "ses_arrondissement_fctCité-Limoilou" ~ 3,
-        Variable_raw == "ses_arrondissement_fctLes Rivières" ~ 4,
-        Variable_raw == "ses_arrondissement_fctSte-Foy-Sillery-Cap-Rouge" ~ 5,
-        Variable_raw == "ses_age_c" ~ 1,
-        Variable_raw == "ses_femme_fct1" ~ 2,
-        Variable_raw == "ses_proprio_fct1" ~ 3,
+        Variable_display == "Collégial/Certificat" ~ 1,
+        Variable_display == "Bacc" ~ 2,
+        Variable_display == "Graduate" ~ 3,
+        Variable_display == "40-79k$" ~ 1,
+        Variable_display == "80-119k$" ~ 2,
+        Variable_display == "120-159k$" ~ 3,
+        Variable_display == "160k$+" ~ 4,
+        Variable_display == "Beauport" ~ 1,
+        Variable_display == "Charlesbourg" ~ 2,
+        Variable_display == "Cité-Limoilou" ~ 3,
+        Variable_display == "Les Rivières" ~ 4,
+        Variable_display == "Ste-Foy-Sillery-Cap-Rouge" ~ 5,
+        Variable_display == "Âge (+1 SD)" ~ 1,
+        Variable_display == "Femme" ~ 2,
+        Variable_display == "Propriétaire" ~ 3,
         TRUE ~ 99
       ),
 
-      # Noms lisibles
-      Variable_display = case_when(
-        Variable_raw == "ses_educ_fctCollegial/Certificat" ~ "Collégial/Certificat",
-        Variable_raw == "ses_educ_fctBacc" ~ "Bacc",
-        Variable_raw == "ses_educ_fctGraduate" ~ "Graduate",
-        Variable_raw == "ses_revenu_fct40-79k" ~ "40-79k$",
-        Variable_raw == "ses_revenu_fct80-119k" ~ "80-119k$",
-        Variable_raw == "ses_revenu_fct120-159k" ~ "120-159k$",
-        Variable_raw == "ses_revenu_fct160k+" ~ "160k$+",
-        Variable_raw == "ses_arrondissement_fctBeauport" ~ "Beauport",
-        Variable_raw == "ses_arrondissement_fctCharlesbourg" ~ "Charlesbourg",
-        Variable_raw == "ses_arrondissement_fctCité-Limoilou" ~ "Cité-Limoilou",
-        Variable_raw == "ses_arrondissement_fctLes Rivières" ~ "Les Rivières",
-        Variable_raw == "ses_arrondissement_fctSte-Foy-Sillery-Cap-Rouge" ~ "Ste-Foy-Sillery-Cap-Rouge",
-        Variable_raw == "ses_age_c" ~ "Âge",
-        Variable_raw == "ses_femme_fct1" ~ "Femme",
-        Variable_raw == "ses_proprio_fct1" ~ "Propriétaire",
-        TRUE ~ Variable_raw
-      ),
-
-      # Ajouter le nom de catégorie pour l'affichage
       Category_num = case_when(
         Category == "Éducation" ~ 4,
         Category == "Revenu" ~ 3,
@@ -426,13 +429,13 @@ create_forest_plot <- function(profil_name, color_profil, model_obj, n_total, n_
         Category == "Contrôles" ~ 1
       ),
 
-      # Texte pour afficher OR et IC
-      OR_text = sprintf("%.2f [%.2f-%.2f]", OR, CI_lower, CI_upper)
+      # Texte pour afficher AME et IC
+      AME_text = sprintf("%.1f [%.1f, %.1f]", AME, CI_lower, CI_upper)
     ) %>%
     arrange(desc(Category_num), Order)
 
   # Créer position y
-  or_data <- or_data %>%
+  ame_data <- ame_data %>%
     mutate(y_position = n():1)
 
   # Calculer pseudo R² (McFadden pour multinomial)
@@ -444,35 +447,36 @@ create_forest_plot <- function(profil_name, color_profil, model_obj, n_total, n_
   pct_profil <- (n_profil / n_total) * 100
 
   # Créer le plot
-  plot_or <- ggplot(or_data, aes(x = OR, y = y_position)) +
-    # Ligne de référence à OR = 1
-    geom_vline(xintercept = 1, linetype = "dashed", color = "grey30", linewidth = 0.8) +
+  plot_ame <- ggplot(ame_data, aes(x = AME, y = y_position)) +
+    # Ligne de référence à AME = 0
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey30", linewidth = 0.8) +
     # Intervalles de confiance
     geom_errorbar(aes(xmin = CI_lower, xmax = CI_upper, color = Significant),
                   width = 0.3, linewidth = 1) +
-    # Points pour les OR
+    # Points pour les AME
     geom_point(aes(color = Significant), size = 4) +
-    # Texte avec OR et IC
-    geom_text(aes(label = OR_text, x = max(CI_upper) * 1.8),
+    # Texte avec AME et IC
+    geom_text(aes(label = AME_text, x = max(CI_upper, na.rm = TRUE) + 5),
               hjust = 0, size = 3, fontface = "bold") +
 
     # Échelles
-    scale_x_log10(limits = c(0.1, max(or_data$CI_upper) * 2.5)) +
-    scale_y_continuous(breaks = or_data$y_position,
-                      labels = or_data$Variable_display) +
+    scale_x_continuous(limits = c(min(ame_data$CI_lower, na.rm = TRUE) - 5,
+                                  max(ame_data$CI_upper, na.rm = TRUE) + 20)) +
+    scale_y_continuous(breaks = ame_data$y_position,
+                      labels = ame_data$Variable_display) +
     scale_color_manual(values = c("Significatif (p < 0.05)" = color_profil,
                                   "Non significatif" = "grey60")) +
 
     # Ajouter des séparateurs entre catégories
-    geom_hline(yintercept = c(max(or_data$y_position[or_data$Category == "Contrôles"]) + 0.5,
-                              max(or_data$y_position[or_data$Category == "Géographie"]) + 0.5,
-                              max(or_data$y_position[or_data$Category == "Revenu"]) + 0.5),
+    geom_hline(yintercept = c(max(ame_data$y_position[ame_data$Category == "Contrôles"]) + 0.5,
+                              max(ame_data$y_position[ame_data$Category == "Géographie"]) + 0.5,
+                              max(ame_data$y_position[ame_data$Category == "Revenu"]) + 0.5),
                linetype = "dotted", color = "grey70", linewidth = 0.5) +
 
-    labs(title = sprintf("Odds Ratios: %s (vs Carbone aligné) | n=%d, %d cas / %.1f%%",
+    labs(title = sprintf("Effets marginaux: %s (vs Carbone aligné) | n=%d, %d cas / %.1f%%",
                          profil_name, n_total, n_profil, pct_profil),
-         subtitle = sprintf("Régression multinomiale (échelle logarithmique) | McFadden R² = %.3f\nRéférences: Secondaire, <40k$, Haute-St-Charles, Homme, Locataire", pseudo_r2),
-         x = "Odds Ratio (IC à 95%)",
+         subtitle = sprintf("Changement de probabilité en points de pourcentage | McFadden R² = %.3f\nRéférences: Secondaire, <40k$, Haute-St-Charles, Homme, Locataire", pseudo_r2),
+         x = "Changement de probabilité (points de %)",
          y = "",
          color = "") +
     coord_cartesian(clip = "off") +
@@ -489,7 +493,7 @@ create_forest_plot <- function(profil_name, color_profil, model_obj, n_total, n_
       plot.margin = margin(10, 80, 10, 10)
     )
 
-  return(plot_or)
+  return(plot_ame)
 }
 
 # Calculer n et cas pour chaque profil
@@ -504,14 +508,14 @@ p5b <- create_forest_plot("Éco contraint", "#FFA726", model_profils, n_total_pr
 p5c <- create_forest_plot("Carbone atypique", "#9C27B0", model_profils, n_total_profils, n_carbone_atypique)
 
 # Sauvegarder les graphiques
-ggsave("odds_ratios_eco_aligne.png", p5a, width = 10, height = 7, dpi = 300)
-cat("Graphique sauvegardé: odds_ratios_eco_aligne.png\n")
+ggsave("marginal_effects_eco_aligne.png", p5a, width = 10, height = 7, dpi = 300)
+cat("Graphique sauvegardé: marginal_effects_eco_aligne.png\n")
 
-ggsave("odds_ratios_eco_contraint.png", p5b, width = 10, height = 7, dpi = 300)
-cat("Graphique sauvegardé: odds_ratios_eco_contraint.png\n")
+ggsave("marginal_effects_eco_contraint.png", p5b, width = 10, height = 7, dpi = 300)
+cat("Graphique sauvegardé: marginal_effects_eco_contraint.png\n")
 
-ggsave("odds_ratios_carbone_atypique.png", p5c, width = 10, height = 7, dpi = 300)
-cat("Graphique sauvegardé: odds_ratios_carbone_atypique.png\n")
+ggsave("marginal_effects_carbone_atypique.png", p5c, width = 10, height = 7, dpi = 300)
+cat("Graphique sauvegardé: marginal_effects_carbone_atypique.png\n")
 
 # ====================================================================
 # 6. SAUVEGARDE DES DONNÉES
@@ -539,9 +543,9 @@ cat("- profils_education.png\n")
 cat("- profils_arrondissement.png\n")
 cat("- repertoire_par_profil.png\n")
 cat("- repertoire_arrondissement.png\n")
-cat("- odds_ratios_eco_aligne.png\n")
-cat("- odds_ratios_eco_contraint.png\n")
-cat("- odds_ratios_carbone_atypique.png\n")
+cat("- marginal_effects_eco_aligne.png\n")
+cat("- marginal_effects_eco_contraint.png\n")
+cat("- marginal_effects_carbone_atypique.png\n")
 cat("- data_culture_v2.rds\n\n")
 
 cat("PRINCIPAUX RÉSULTATS:\n")

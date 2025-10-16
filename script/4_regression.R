@@ -93,34 +93,49 @@ n_coef <- nrow(coef_table) - 3  # 3 intercepts dans le modèle ordinal
 p_values <- p_values_all[1:n_coef]
 
 # ====================================================================
-# 4. ODDS RATIOS ET INTERVALLES DE CONFIANCE
+# 4. AVERAGE MARGINAL EFFECTS (AME)
 # ====================================================================
 
 cat("\n========================================\n")
-cat("ODDS RATIOS (Régression ordinale)\n")
+cat("AVERAGE MARGINAL EFFECTS (AME) - Régression ordinale\n")
 cat("========================================\n\n")
 
-# Calculer les odds ratios
-or_ord <- exp(coef(model_ord))
-ci_ord_full <- confint(model_ord)
+# Calculer les AME pour toutes les variables
+# AME = changement moyen de probabilité d'être "Favorable" (niveau le plus élevé)
+# Pour les modèles ordinaux, on utilise avg_comparisons au lieu de slopes
 
-# Extraire seulement les CI des coefficients (en excluant les intercepts)
-# Les intercepts sont à la fin dans confint()
-coef_names <- names(or_ord)
-ci_ord <- ci_ord_full[coef_names, ]
-ci_ord <- exp(ci_ord)
+# Comparaisons pour les variables catégorielles et continues
+ame_ord <- avg_comparisons(model_ord,
+                           variables = list(
+                             ses_educ_fct = "reference",
+                             ses_revenu_fct = "reference",
+                             ses_arrondissement_fct = "reference",
+                             ses_age_c = "sd",  # Effet d'1 écart-type
+                             ses_femme_fct = "reference",
+                             ses_proprio_fct = "reference"
+                           ),
+                           type = "probs",
+                           by = "group")  # Calculer pour chaque niveau de la VD
 
-# Créer un tableau des OR avec IC à 95%
-or_table <- data.frame(
-  Variable = coef_names,
-  OR = as.numeric(or_ord),
-  CI_lower = ci_ord[, 1],
-  CI_upper = ci_ord[, 2],
-  p_value = p_values,
-  row.names = NULL
-)
+# Filtrer pour le niveau "Favorable" (le plus élevé)
+ame_favorable <- ame_ord %>%
+  filter(group == "Favorable") %>%
+  dplyr::select(term, contrast, estimate, std.error, conf.low, conf.high, p.value, group)
 
-print(or_table)
+cat("Effets marginaux moyens sur Pr(Favorable au tramway):\n")
+cat("(= Changement de probabilité en points de pourcentage)\n\n")
+print(ame_favorable)
+
+# Créer un tableau formatté pour les graphiques
+ame_table <- ame_favorable %>%
+  mutate(
+    AME = estimate * 100,  # Convertir en points de pourcentage
+    CI_lower = conf.low * 100,
+    CI_upper = conf.high * 100,
+    Variable = term,
+    Contrast = as.character(contrast)
+  ) %>%
+  dplyr::select(Variable, Contrast, AME, CI_lower, CI_upper, p.value)
 
 # ====================================================================
 # 5. MODÈLE 2: Régression logistique binaire (opposé vs favorable)
@@ -140,19 +155,29 @@ model_bin <- glm(op_tram_bin ~ ses_educ_fct + ses_revenu_fct + ses_age_c +
 
 summary(model_bin)
 
-# Odds ratios pour modèle binaire
-cat("\n--- Odds Ratios (Régression binaire) ---\n")
-or_bin <- exp(coef(model_bin))
-ci_bin <- exp(confint(model_bin))
+# Average Marginal Effects pour modèle binaire
+cat("\n--- Average Marginal Effects (Régression binaire) ---\n")
 
-or_table_bin <- data.frame(
-  Variable = names(or_bin),
-  OR = or_bin,
-  CI_lower = ci_bin[, 1],
-  CI_upper = ci_bin[, 2]
-)
+ame_bin <- avg_comparisons(model_bin,
+                           variables = list(
+                             ses_educ_fct = "reference",
+                             ses_revenu_fct = "reference",
+                             ses_arrondissement_fct = "reference",
+                             ses_age_c = "sd",
+                             ses_femme_fct = "reference",
+                             ses_proprio_fct = "reference"
+                           ),
+                           type = "response")
 
-print(or_table_bin)
+ame_table_bin <- ame_bin %>%
+  mutate(
+    AME = estimate * 100,  # Points de pourcentage
+    CI_lower = conf.low * 100,
+    CI_upper = conf.high * 100
+  ) %>%
+  dplyr::select(term, contrast, AME, CI_lower, CI_upper, p.value)
+
+print(ame_table_bin)
 
 # ====================================================================
 # 6. PROBABILITÉS PRÉDITES
@@ -206,9 +231,8 @@ cat("\n========================================\n")
 cat("CRÉATION DES GRAPHIQUES\n")
 cat("========================================\n\n")
 
-# 7.1 Forest plot des odds ratios
-or_plot_data <- or_table %>%
-  filter(!grepl("Intercept", Variable)) %>%
+# 7.1 Forest plot des Average Marginal Effects
+ame_plot_data <- ame_table %>%
   mutate(
     # Catégorisation des variables
     Category = case_when(
@@ -220,45 +244,47 @@ or_plot_data <- or_table %>%
       grepl("ses_proprio_fct", Variable) ~ "Statut résidentiel",
       TRUE ~ "Autre"
     ),
-    # Ordre pour tri dans chaque catégorie
+    # Extraire le niveau de la variable à partir du contrast
+    Variable_level = case_when(
+      grepl("Collegial", Contrast) ~ "Collégial/Certificat",
+      grepl("Bacc", Contrast) & !grepl("Graduate", Contrast) ~ "Baccalauréat",
+      grepl("Graduate", Contrast) ~ "Études graduées",
+      grepl("40-79k", Contrast) ~ "40-79k$",
+      grepl("80-119k", Contrast) ~ "80-119k$",
+      grepl("120-159k", Contrast) ~ "120-159k$",
+      grepl("160k", Contrast) ~ "160k$+",
+      grepl("Beauport", Contrast) ~ "Beauport",
+      grepl("Charlesbourg", Contrast) ~ "Charlesbourg",
+      grepl("Cité-Limoilou", Contrast) ~ "Cité-Limoilou",
+      grepl("Les Rivières", Contrast) ~ "Les Rivières",
+      grepl("Ste-Foy", Contrast) ~ "Ste-Foy-Sillery-Cap-Rouge",
+      grepl("age", Variable) ~ "Âge (+1 SD)",
+      grepl("femme", Variable) ~ "Femme",
+      grepl("proprio", Variable) ~ "Propriétaire",
+      TRUE ~ as.character(Contrast)
+    ),
+    # Ordre pour tri
     Order = case_when(
-      Variable == "ses_educ_fctCollegial/Certificat" ~ 1,
-      Variable == "ses_educ_fctBacc" ~ 2,
-      Variable == "ses_educ_fctGraduate" ~ 3,
-      Variable == "ses_revenu_fct40-79k" ~ 4,
-      Variable == "ses_revenu_fct80-119k" ~ 5,
-      Variable == "ses_revenu_fct120-159k" ~ 6,
-      Variable == "ses_revenu_fct160k+" ~ 7,
-      Variable == "ses_age_c" ~ 8,
-      Variable == "ses_femme_fct1" ~ 9,
-      Variable == "ses_proprio_fct1" ~ 10,
+      Variable_level == "Collégial/Certificat" ~ 1,
+      Variable_level == "Baccalauréat" ~ 2,
+      Variable_level == "Études graduées" ~ 3,
+      Variable_level == "40-79k$" ~ 4,
+      Variable_level == "80-119k$" ~ 5,
+      Variable_level == "120-159k$" ~ 6,
+      Variable_level == "160k$+" ~ 7,
+      Variable_level == "Âge (+1 SD)" ~ 8,
+      Variable_level == "Femme" ~ 9,
+      Variable_level == "Propriétaire" ~ 10,
       TRUE ~ 11
     ),
-    # Noms de variables nettoyés
-    Variable_clean = case_when(
-      Variable == "ses_educ_fctCollegial/Certificat" ~ "Collégial/Certificat",
-      Variable == "ses_educ_fctBacc" ~ "Baccalauréat",
-      Variable == "ses_educ_fctGraduate" ~ "Études graduées",
-      Variable == "ses_revenu_fct40-79k" ~ "40-79k$",
-      Variable == "ses_revenu_fct80-119k" ~ "80-119k$",
-      Variable == "ses_revenu_fct120-159k" ~ "120-159k$",
-      Variable == "ses_revenu_fct160k+" ~ "160k$+",
-      Variable == "ses_age_c" ~ "Âge",
-      Variable == "ses_femme_fct1" ~ "Femme",
-      Variable == "ses_proprio_fct1" ~ "Propriétaire",
-      grepl("ses_arrondissement_fct", Variable) ~ gsub("ses_arrondissement_fct", "", Variable),
-      TRUE ~ Variable
-    ),
-    # Ajouter le nom de catégorie pour l'affichage
-    Variable_display = paste0(Variable_clean),
-    Significant = ifelse(p_value < 0.05, "Significatif (p < 0.05)", "Non significatif"),
-    # Texte pour afficher OR et IC
-    OR_text = sprintf("%.2f [%.2f-%.2f]", OR, CI_lower, CI_upper)
+    Significant = ifelse(p.value < 0.05, "Significatif (p < 0.05)", "Non significatif"),
+    # Texte pour afficher AME et IC
+    AME_text = sprintf("%.1f [%.1f, %.1f]", AME, CI_lower, CI_upper)
   ) %>%
   arrange(desc(Category), Order)
 
 # Créer une variable de position pour l'axe Y
-or_plot_data <- or_plot_data %>%
+ame_plot_data <- ame_plot_data %>%
   mutate(y_position = row_number())
 
 # Calculer n total et cas favorable (position >= 0.67)
@@ -270,30 +296,31 @@ pct_favorable <- (n_favorable / n_total_tram) * 100
 null_model_ord <- polr(op_tram_ord ~ 1, data = data_reg, weights = POND, Hess = TRUE)
 pseudo_r2 <- 1 - (logLik(model_ord)[1] / logLik(null_model_ord)[1])
 
-plot_or <- ggplot(or_plot_data, aes(x = OR, y = y_position)) +
-  # Ligne de référence à OR = 1
-  geom_vline(xintercept = 1, linetype = "dashed", color = "grey30", linewidth = 0.8) +
+plot_ame <- ggplot(ame_plot_data, aes(x = AME, y = y_position)) +
+  # Ligne de référence à AME = 0
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey30", linewidth = 0.8) +
   # Intervalles de confiance
   geom_errorbar(aes(xmin = CI_lower, xmax = CI_upper, color = Significant),
                 width = 0.3, linewidth = 1) +
-  # Points pour les OR
+  # Points pour les AME
   geom_point(aes(color = Significant), size = 4) +
-  # Texte avec OR et IC
-  geom_text(aes(label = OR_text, x = max(CI_upper) * 1.8),
+  # Texte avec AME et IC
+  geom_text(aes(label = AME_text, x = max(CI_upper, na.rm = TRUE) + 5),
             hjust = 0, size = 3, fontface = "bold") +
   # Échelles
-  scale_x_log10(limits = c(0.1, max(or_plot_data$CI_upper) * 2.5)) +
-  scale_y_continuous(breaks = or_plot_data$y_position,
-                    labels = or_plot_data$Variable_display) +
+  scale_x_continuous(limits = c(min(ame_plot_data$CI_lower, na.rm = TRUE) - 5,
+                                max(ame_plot_data$CI_upper, na.rm = TRUE) + 20)) +
+  scale_y_continuous(breaks = ame_plot_data$y_position,
+                    labels = ame_plot_data$Variable_level) +
   scale_color_manual(values = c("Significatif (p < 0.05)" = "#1976D2",
                                 "Non significatif" = "grey60")) +
   # Ajouter des séparateurs entre catégories
   geom_hline(yintercept = c(3.5, 7.5, 9.5, 10.5),
              linetype = "dotted", color = "grey70", linewidth = 0.5) +
-  labs(title = sprintf("Odds Ratios: Position envers le tramway (n=%d, %d cas favorables / %.1f%%)",
+  labs(title = sprintf("Effets marginaux: Position favorable au tramway (n=%d, %d cas / %.1f%%)",
                        n_total_tram, n_favorable, pct_favorable),
-       subtitle = sprintf("Régression ordinale (échelle logarithmique) | McFadden R² = %.3f\nRéférences: Secondaire, <40k$, Haute-St-Charles, Homme, Locataire", pseudo_r2),
-       x = "Odds Ratio (IC à 95%)",
+       subtitle = sprintf("Changement de probabilité en points de pourcentage | McFadden R² = %.3f\nRéférences: Secondaire, <40k$, Haute-St-Charles, Homme, Locataire", pseudo_r2),
+       x = "Changement de probabilité (points de %)",
        y = "",
        color = "") +
   coord_cartesian(clip = "off") +
@@ -310,10 +337,10 @@ plot_or <- ggplot(or_plot_data, aes(x = OR, y = y_position)) +
     plot.margin = margin(10, 80, 10, 10)
   )
 
-ggsave("_SharedFolder_culture_carbone/graph/output/odds_ratios_tramway.png",
-       plot_or, width = 10, height = 7, dpi = 300)
+ggsave("_SharedFolder_culture_carbone/graph/output/marginal_effects_tramway.png",
+       plot_ame, width = 10, height = 7, dpi = 300)
 
-cat("Graphique sauvegardé: odds_ratios_tramway.png\n")
+cat("Graphique sauvegardé: marginal_effects_tramway.png\n")
 
 # 7.2 Probabilités prédites par éducation
 pred_educ_df <- as.data.frame(pred_educ) %>%
